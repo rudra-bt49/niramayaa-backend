@@ -1,11 +1,21 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import prisma from "../../prisma/prisma";
-import { IPatientSignupRequest, ILoginRequest, ISendVerificationOtpRequest, IVerifyOtpRequest, IDoctorSignupRequest } from "./auth.types";
+import {
+    IPatientSignupRequest,
+    ILoginRequest,
+    ISendVerificationOtpRequest,
+    IVerifyOtpRequest,
+    IDoctorSignupRequest,
+    IForgotPasswordRequest,
+    IResetPasswordRequest
+} from "./auth.types";
 import { UserRole } from "../../shared/constants/roles";
 import { tokenUtil } from "../../shared/utils/token.util";
 import { sessionService } from "./session.service";
 import { stripeService } from "../../shared/services/stripe.service";
 import { StripeConfig } from "../../config/stripe.config";
+import { hashUtil } from "../../shared/utils/hash.util";
 
 export const authService = {
     sendVerificationOtp: async (data: ISendVerificationOtpRequest) => {
@@ -337,4 +347,64 @@ export const authService = {
             refreshToken,
         };
     },
+    forgotPassword: async (data: IForgotPasswordRequest) => {
+        const { email } = data;
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) return; // Silent return for security
+
+        // Generate raw hex token (64 chars)
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = hashUtil.hashString(rawToken);
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await prisma.password_reset_token.create({
+            data: {
+                user_id: user.id,
+                token_hash: tokenHash,
+                expires_at: expiresAt,
+            },
+        });
+
+        // Simulated: Log token for development
+        console.log(`[PASSWORD RESET for ${email}]: ${rawToken}`);
+    },
+
+    resetPassword: async (data: IResetPasswordRequest) => {
+        const { token, password } = data;
+        const tokenHash = hashUtil.hashString(token);
+
+        const tokenRecord = await prisma.password_reset_token.findUnique({
+            where: { token_hash: tokenHash },
+            include: { user: true }
+        });
+
+        if (!tokenRecord || tokenRecord.is_used || tokenRecord.expires_at < new Date()) {
+            const error: any = new Error("Invalid or expired reset token");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const password_hash = await bcrypt.hash(password, 10);
+
+        await prisma.$transaction(async (tx) => {
+            // Update password
+            await tx.user.update({
+                where: { id: tokenRecord.user_id },
+                data: { password_hash },
+            });
+
+            // Mark token as used
+            await tx.password_reset_token.update({
+                where: { id: tokenRecord.id },
+                data: { is_used: true },
+            });
+
+            // Revoke all existing sessions for security
+            await tx.user_session.updateMany({
+                where: { user_id: tokenRecord.user_id },
+                data: { is_active: false },
+            });
+        });
+    }
 };

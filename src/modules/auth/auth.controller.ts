@@ -99,4 +99,26 @@ export const authController = {
             )
         );
     }),
+
+    forgotPassword: asyncHandler(async (req: Request, res: Response) => {
+        await authService.forgotPassword(req.body);
+        res.status(200).json(
+            ApiResponse.success(
+                null,
+                "If an account with that email exists, we have sent a reset link",
+                200
+            )
+        );
+    }),
+
+    resetPassword: asyncHandler(async (req: Request, res: Response) => {
+        await authService.resetPassword(req.body);
+        res.status(200).json(
+            ApiResponse.success(
+                null,
+                "Password reset successful. All active sessions have been logged out.",
+                200
+            )
+        );
+    }),
 };

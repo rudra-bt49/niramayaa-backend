@@ -107,5 +107,30 @@ To test the flow without a real domain:
 
 ---
 
-## 6. Login & Session Management
+## 6. Password Reset Flow
+
+### Step 6.1: Forgot Password
+**Endpoint**: `POST /api/auth/forgot-password`  
+**Body**:
+```json
+{
+    "email": "doctor@example.com"
+}
+```
+> [!NOTE]
+> Check your **Backend Console** (terminal) to see the reset token.
+
+### Step 6.2: Reset Password
+**Endpoint**: `POST /api/auth/reset-password`  
+**Body**:
+```json
+{
+    "token": "PASTE_TOKEN_FROM_CONSOLE",
+    "password": "NewPassword@123"
+}
+```
+
+---
+
+## 7. Login & Session Management
 ... (rest of the file remains same)

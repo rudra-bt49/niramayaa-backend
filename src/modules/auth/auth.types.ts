@@ -77,3 +77,13 @@ export interface ILoginRequest {
   forceLogout?: boolean; // For single device login policy
 }
 export interface ILoginResponse extends IApiResponse<IAuthResponseData> { }
+
+// Forgot/Reset Password
+export interface IForgotPasswordRequest {
+  email: string;
+}
+
+export interface IResetPasswordRequest {
+  token: string;
+  password: string;
+}

@@ -75,3 +75,16 @@ export const doctorSignupSchema = z.object({
         verification_token: z.string().min(1, "Verification token is required"),
     }),
 });
+
+export const forgotPasswordSchema = z.object({
+    body: z.object({
+        email: z.string().email("Invalid email format"),
+    }),
+});
+
+export const resetPasswordSchema = z.object({
+    body: z.object({
+        token: z.string().min(1, "Reset token is required"),
+        password: z.string().regex(REGEX.PASSWORD, "Password must be at least 8 characters, one uppercase, one lowercase, one number and one special character"),
+    }),
+});
