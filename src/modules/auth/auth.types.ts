@@ -11,50 +11,45 @@ export interface IPatientSignupRequest {
   gender: Gender;
   city: IndianCity;
   dob: string;
+  verification_token: string;
 }
-export interface IPatientSignupResponse extends IApiResponse<null> {}
+export interface IAuthResponseData {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    first_name: string;
+    last_name: string;
+  };
+  accessToken: string;
+  refreshToken: string;
+}
 
-// doctor signup request
-export interface IDoctorSignupRequest {
-  email: string;
-  first_name: string;
-  last_name: string;
-  phone_number: string;
-  password: string;
-  gender: Gender;
-  city: IndianCity;
-  dob: string;
-  qualifications: Qualification[];
-  experience: number;
-  specialties: Specialty[];
-  consultation_fee: number;
-  plan_name: doctor_plan["plan_name"];
-}
-export interface IDoctorSignupResponse extends IApiResponse<null> {}
+export interface IPatientSignupResponse extends IApiResponse<IAuthResponseData> { }
 
 // send verification otp request and response
 export interface ISendVerificationOtpRequest {
-    email: string;
+  email: string;
 }
 interface IVerificationOtpData {
   token: string; // JWT containing hashed OTP — no DB storage needed
 }
-export interface ISendVerificationOtpResponse extends IApiResponse<IVerificationOtpData> {}
+export interface ISendVerificationOtpResponse extends IApiResponse<IVerificationOtpData> { }
 
 //verification otp request and response
 export interface IVerifyOtpRequest {
   token: string;
   otp: string;
 }
-export interface IVerifyOtpResponse extends IApiResponse<null> {}
+interface IVerificationTokenData {
+  verification_token: string;
+}
+export interface IVerifyOtpResponse extends IApiResponse<IVerificationTokenData> { }
 
 // login request and response
 export interface ILoginRequest {
   email: string;
   password: string;
+  forceLogout?: boolean; // For single device login policy
 }
-interface ILoginData {
-  accessToken: string;
-  refreshToken: string;
-}
-export interface ILoginResponse extends IApiResponse<ILoginData> {}
+export interface ILoginResponse extends IApiResponse<IAuthResponseData> { }
