@@ -1,5 +1,6 @@
 import prisma from "../../prisma/prisma";
 import { stripeService } from "../../shared/services/stripe.service";
+import emailService from "../../shared/services/email.service";
 import { UserRole } from "../../shared/constants/roles";
 
 export const paymentService = {
@@ -45,13 +46,15 @@ async function handleCompletedSubscription(session: any) {
     }
 
     try {
-        await prisma.$transaction(async (tx) => {
+        let receipt_url: string | null = null;
+
+        const result = await prisma.$transaction(async (tx) => {
             // 1. Check if user already exists (concurrency safety)
             let user = await tx.user.findUnique({ where: { email } });
 
             if (user) {
                 console.log(`ℹ️ Webhook: User ${email} already exists, skipping creation.`);
-                return;
+                return null;
             }
 
             // 2. Get Doctor Role
@@ -94,7 +97,6 @@ async function handleCompletedSubscription(session: any) {
             });
 
             // 5. Fetch expanded session to get receipt_url (optional but good)
-            let receipt_url = null;
             try {
                 const expandedSession = await stripeService.getSessionDetails(session.id);
                 const paymentIntent = expandedSession.payment_intent as any;
@@ -118,7 +120,23 @@ async function handleCompletedSubscription(session: any) {
             });
 
             console.log(`✅ Success: Created user and doctor profile for ${email} via Webhook.`);
+
+            return { user, plan };
         });
+
+        // 7. Send Invoice Email (Outside transaction for performance)
+        if (result) {
+            const { user, plan } = result;
+            await emailService.sendSubscriptionInvoice(
+                user.email,
+                user.first_name,
+                plan.plan_name,
+                session.amount_total / 100,
+                receipt_url
+            ).catch(err => {
+                console.error("⚠️ Webhook: Failed to send invoice email", err);
+            });
+        }
     } catch (error) {
         console.error("❌ Webhook Error processing doctor creation:", error);
         throw error;

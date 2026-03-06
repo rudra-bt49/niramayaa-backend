@@ -16,6 +16,7 @@ import { sessionService } from "./session.service";
 import { stripeService } from "../../shared/services/stripe.service";
 import { StripeConfig } from "../../config/stripe.config";
 import { hashUtil } from "../../shared/utils/hash.util";
+import emailService from "../../shared/services/email.service";
 
 export const authService = {
     sendVerificationOtp: async (data: ISendVerificationOtpRequest) => {
@@ -27,7 +28,12 @@ export const authService = {
         // 2. Generate short-lived token containing OTP and email
         const token = tokenUtil.generateOtpToken({ email, otp });
 
-        // 3. Log OTP for development (in production, this would be emailed)
+        // 3. Send OTP via Email
+        await emailService.sendVerificationOtpEmail(email, otp).catch(err => {
+            console.error(`Failed to send OTP to ${email}:`, err);
+        });
+
+        // Log for development
         console.log(`[OTP for ${email}]: ${otp}`);
 
         return { token };
@@ -364,6 +370,11 @@ export const authService = {
                 token_hash: tokenHash,
                 expires_at: expiresAt,
             },
+        });
+
+        // 3. Send Reset Email
+        await emailService.sendPasswordResetEmail(email, user.first_name, rawToken).catch(err => {
+            console.error(`Failed to send reset email to ${email}:`, err);
         });
 
         // Simulated: Log token for development
