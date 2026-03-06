@@ -4,6 +4,7 @@ import helmet from "helmet";
 import apiRoutes from "./routes/api";
 import { errorHandler } from "./middlewares/error.middleware";
 import { APP_CONSTANTS } from "./shared/constants/app.constants";
+import { API } from "./shared/constants/api-routes";
 
 const app = express();
 
@@ -19,7 +20,16 @@ app.use(
 );
 
 // Body parsers
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, res, buf) => {
+      const webhookPath = `${APP_CONSTANTS.API_BASE_PATH}${API.PAYMENT.WEBHOOK}`;
+      if (req.originalUrl === webhookPath) {
+        req.rawBody = buf;
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 // Health check route

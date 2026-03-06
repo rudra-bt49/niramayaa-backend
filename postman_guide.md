@@ -34,16 +34,16 @@ This guide walk you through testing the authentication flow using Postman.
     "otp": "123456" 
 }
 ```
-**Expected Response**: `success: true` if the OTP matches.
+**Expected Response**: Returns a `verification_token`. **Copy this token** — it is required for registration.
 
 ---
 
-### Step 3: Patient Signup
+## 3. Patient Signup Flow
 **Endpoint**: `POST /api/auth/patient-signup`  
 **Body**:
 ```json
 {
-    "email": "test@example.com",
+    "email": "patient@example.com",
     "first_name": "John",
     "last_name": "Doe",
     "phone_number": "9876543210",
@@ -51,43 +51,61 @@ This guide walk you through testing the authentication flow using Postman.
     "gender": "MALE",
     "city": "MUMBAI",
     "dob": "1995-01-01",
-    "otp_token": "PASTE_TOKEN_FROM_STEP_1",
-    "otp": "123456"
+    "verification_token": "PASTE_TOKEN_FROM_STEP_2"
 }
 ```
-**Expected Response**: User object + `accessToken` + `refreshToken` (in cookie).
+**Expected Response**: User object + `accessToken`.
 
 ---
 
-## 3. Login & Session Management
+## 4. Doctor Signup (Resilient Flow)
 
-### Login (First Device)
-**Endpoint**: `POST /api/auth/login`  
+### Step 4.1: Initiate Signup
+**Endpoint**: `POST /api/auth/doctor-signup`  
 **Body**:
 ```json
 {
-    "email": "test@example.com",
-    "password": "Password@123"
-}
-```
-
-### Login (Second Device Attempt)
-If you try to login again while the first session is active:
-**Expected Response**: `409 Conflict` - "You are already logged in on another device..."
-
-### Force Logout (Confirm Login)
-To logout from the other device and login here:
-**Body**:
-```json
-{
-    "email": "test@example.com",
+    "email": "doctor@example.com",
+    "first_name": "Jane",
+    "last_name": "Smith",
+    "phone_number": "9999988888",
     "password": "Password@123",
-    "forceLogout": true
+    "gender": "FEMALE",
+    "city": "PUNE",
+    "dob": "1985-05-15",
+    "qualifications": ["MBBS", "MD"],
+    "experience": 10,
+    "specialties": ["CARDIOLOGY"],
+    "consultation_fee": 1000,
+    "plan_name": "PRO",
+    "verification_token": "PASTE_TOKEN_FROM_STEP_2"
 }
 ```
+**Expected Response**: `sessionUrl` (Stripe Link).
+
+### Step 4.2: Payment & Webhook
+1. Open the `sessionUrl` in a browser and finish payment with a test card (4242...).
+2. Stripe will call your host's Webhook (use **Stripe CLI** to listen locally).
+
+### Step 4.3: Auto-Login
+**Endpoint**: `POST /api/auth/doctor-signup/verify-session`  
+**Body**:
+```json
+{
+    "session_id": "PASTE_cs_test_SESSION_ID_FROM_SUCCESS_URL"
+}
+```
+**Expected Response**: Logged in user data + `accessToken`.
 
 ---
 
-## 4. Health Check
-**Endpoint**: `GET /`  
-**Expected Response**: `Niramayaa backend is up and running 🚀`
+## 5. Simulating Webhooks (Stripe CLI)
+To test the flow without a real domain:
+1.  [Install Stripe CLI](https://stripe.com/docs/stripe-cli).
+2.  Run: `stripe listen --forward-to http://localhost:5000/api/payments/webhook`.
+3.  The console will show "✅ Success" when the webhook hits your local server.
+
+---
+
+## 6. Login & Session Management
+... (rest of the file remains same)

@@ -63,4 +63,40 @@ export const authController = {
             )
         );
     }),
+
+    signupDoctor: asyncHandler(async (req: Request, res: Response) => {
+        const result = await authService.doctorSignup(req.body);
+        res.status(200).json(
+            ApiResponse.success(result, "Doctor registration initiated. Please complete the payment.", 200)
+        );
+    }),
+
+    verifyDoctorSession: asyncHandler(async (req: Request, res: Response) => {
+        const { session_id } = req.body;
+        if (!session_id) {
+            res.status(400).json(ApiResponse.error("Session ID is required", 400));
+            return;
+        }
+
+        const result = await authService.verifyDoctorPaymentSession(session_id);
+
+        // Set refresh token in HTTP-only cookie
+        res.cookie('refreshToken', result.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+
+        res.status(200).json(
+            ApiResponse.success(
+                {
+                    user: result.user,
+                    accessToken: result.accessToken,
+                },
+                "Doctor session verified and logged in successfully",
+                200
+            )
+        );
+    }),
 };

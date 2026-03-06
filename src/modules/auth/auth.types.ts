@@ -13,6 +13,30 @@ export interface IPatientSignupRequest {
   dob: string;
   verification_token: string;
 }
+
+// doctor signup request
+export interface IDoctorSignupRequest {
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  password: string;
+  gender: Gender;
+  city: IndianCity;
+  dob: string;
+  qualifications: Qualification[];
+  experience: number;
+  specialties: Specialty[];
+  consultation_fee: number;
+  plan_name: doctor_plan["plan_name"];
+  verification_token: string;
+}
+
+export interface IDoctorSignupResponse extends IApiResponse<{
+  sessionId: string | null;
+  sessionUrl: string | null;
+}> { }
+
 export interface IAuthResponseData {
   user: {
     id: string;

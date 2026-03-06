@@ -1,9 +1,11 @@
 import bcrypt from "bcrypt";
 import prisma from "../../prisma/prisma";
-import { IPatientSignupRequest, ILoginRequest, ISendVerificationOtpRequest, IVerifyOtpRequest } from "./auth.types";
+import { IPatientSignupRequest, ILoginRequest, ISendVerificationOtpRequest, IVerifyOtpRequest, IDoctorSignupRequest } from "./auth.types";
 import { UserRole } from "../../shared/constants/roles";
 import { tokenUtil } from "../../shared/utils/token.util";
 import { sessionService } from "./session.service";
+import { stripeService } from "../../shared/services/stripe.service";
+import { StripeConfig } from "../../config/stripe.config";
 
 export const authService = {
     sendVerificationOtp: async (data: ISendVerificationOtpRequest) => {
@@ -138,6 +140,136 @@ export const authService = {
                 role: newUser.role.name,
                 first_name: newUser.first_name,
                 last_name: newUser.last_name,
+            },
+            accessToken,
+            refreshToken,
+        };
+    },
+
+    doctorSignup: async (data: IDoctorSignupRequest) => {
+        const { email, first_name, last_name, phone_number, password, gender, city, dob, qualifications, experience, specialties, consultation_fee, plan_name, verification_token } = data;
+
+        // 0. Verify the "Success Hall Pass" token
+        try {
+            const decoded = tokenUtil.verifyVerificationToken(verification_token);
+            if (!decoded.isVerified || decoded.email !== email) {
+                const error: any = new Error("Email verification failed or email mismatch");
+                error.statusCode = 400;
+                throw error;
+            }
+        } catch (error: any) {
+            const err: any = new Error("Invalid or expired verification token. Please verify your email again.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // 1. Check if user exists (to prevent duplicate starts)
+        const existingUser = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (existingUser) {
+            const error: any = new Error("User with this email already exists");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // 2. Hash password
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(password, salt);
+
+        // 3. Find the Plan
+        const plan = await prisma.doctor_plan.findUnique({
+            where: { plan_name: plan_name },
+        });
+
+        if (!plan) {
+            const error: any = new Error(`Invalid plan: ${plan_name}`);
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // 4. Create Stripe Checkout Session with full data in metadata
+        // Stripe metadata has a 500 character limit per key, so we store logically.
+        const session = await stripeService.createCheckoutSession({
+            doctorEmail: email,
+            planName: plan.plan_name,
+            amount: plan.amount,
+            successUrl: `${StripeConfig.SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: StripeConfig.CANCEL_URL,
+            metadata: {
+                email,
+                first_name,
+                last_name,
+                phone_number: `+91${phone_number}`,
+                password_hash,
+                gender,
+                city,
+                dob,
+                qualifications: JSON.stringify(qualifications),
+                experience: experience.toString(),
+                specialties: JSON.stringify(specialties),
+                consultation_fee: consultation_fee.toString(),
+                plan_name: plan.plan_name,
+                registration_type: 'DOCTOR_SIGNUP'
+            },
+        });
+
+        return {
+            sessionId: session.id,
+            sessionUrl: session.url,
+        };
+    },
+
+    verifyDoctorPaymentSession: async (sessionId: string) => {
+        if (!process.env.STRIPE_SECRET_KEY) {
+            throw new Error('STRIPE_SECRET_KEY is missing');
+        }
+
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        if (session.payment_status !== 'paid') {
+            const error: any = new Error("Payment not completed yet.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const email = session.metadata?.email;
+        if (!email) throw new Error("Email not found in session metadata");
+
+        // The user was created by the Webhook
+        const user = await prisma.user.findUnique({
+            where: { email },
+            include: { role: true }
+        });
+
+        if (!user) {
+            const error: any = new Error("Registration in progress. Please wait a moment and try again.");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        // Generate tokens
+        const payload = {
+            userId: user.id,
+            email: user.email,
+            role: user.role.name,
+        };
+
+        const accessToken = tokenUtil.generateAccessToken(payload);
+        const refreshToken = tokenUtil.generateRefreshToken(payload);
+
+        // Store session
+        await sessionService.createSession(user.id, refreshToken);
+
+        return {
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role.name,
+                first_name: user.first_name,
+                last_name: user.last_name,
             },
             accessToken,
             refreshToken,

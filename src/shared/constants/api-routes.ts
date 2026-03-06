@@ -8,5 +8,9 @@ export const API = {
         VERIFY_OTP: '/verify-otp',
         PATIENT_SIGNUP: '/auth/patient-signup',
         DOCTOR_SIGNUP: '/auth/doctor-signup',
+        VERIFY_DOCTOR_SESSION: '/auth/doctor-signup/verify-session',
+    },
+    PAYMENT: {
+        WEBHOOK: '/payments/webhook',
     },
 };

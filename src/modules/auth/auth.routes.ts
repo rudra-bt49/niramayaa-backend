@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authController } from "./auth.controller";
 import { validate } from "../../middlewares/validate.middleware";
-import { patientSignupSchema, loginSchema, sendOtpSchema, verifyOtpSchema } from "./auth.validator";
+import { patientSignupSchema, loginSchema, sendOtpSchema, verifyOtpSchema, doctorSignupSchema } from "./auth.validator";
 import { API } from "../../shared/constants/api-routes";
 
 const router = Router();
@@ -22,6 +22,17 @@ router.post(
     API.AUTH.PATIENT_SIGNUP,
     validate(patientSignupSchema),
     authController.signupPatient
+);
+
+router.post(
+    API.AUTH.DOCTOR_SIGNUP,
+    validate(doctorSignupSchema),
+    authController.signupDoctor
+);
+
+router.post(
+    API.AUTH.VERIFY_DOCTOR_SESSION,
+    authController.verifyDoctorSession
 );
 
 router.post(
