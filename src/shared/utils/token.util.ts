@@ -1,13 +1,13 @@
 import jwt from "jsonwebtoken";
 import { ITokenPayload, IVerificationOtpPayload, IEmailVerificationPayload } from "../../types/token.types";
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "default_access_secret";
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "default_refresh_secret";
-const OTP_TOKEN_SECRET = process.env.OTP_TOKEN_SECRET || "default_otp_secret";
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET as string;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
+const OTP_TOKEN_SECRET = process.env.OTP_TOKEN_SECRET as string;
 
-const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || "15m";
-const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || "7d";
-const OTP_TOKEN_EXPIRY = process.env.OTP_TOKEN_EXPIRY || "5m"; // 5 minutes default for OTP
+const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY;
+const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY;
+const OTP_TOKEN_EXPIRY = process.env.OTP_TOKEN_EXPIRY; // 5 minutes default for OTP
 
 export const tokenUtil = {
     generateAccessToken: (payload: ITokenPayload) => {

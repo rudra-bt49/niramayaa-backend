@@ -70,7 +70,7 @@ export const doctorSignupSchema = z.object({
         qualifications: z.array(z.nativeEnum(Qualification)).min(1, "At least one qualification is required"),
         experience: z.number().min(0, "Experience cannot be negative"),
         specialties: z.array(z.nativeEnum(Specialty)).min(1, "At least one specialty is required"),
-        consultation_fee: z.number().min(0, "Fee cannot be negative"),
+        consultation_fee: z.number().min(10, "Fee must be at least 10"),
         plan_name: z.enum(["ELITE", "PRO"], { message: "Invalid plan name" }),
         verification_token: z.string().min(1, "Verification token is required"),
     }),
