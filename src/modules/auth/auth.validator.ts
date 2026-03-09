@@ -2,9 +2,21 @@ import { z } from "zod";
 import { Gender, IndianCity, Qualification, Specialty } from "@prisma/client";
 import { REGEX } from "../../shared/constants/regex.constants";
 
+const calculateAge = (dob: string) => {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+};
+ 
+
 export const patientSignupSchema = z.object({
     body: z.object({
-        email: z.string().email("Invalid email format"),
+        email: z.string().regex(REGEX.EMAIL, "Invalid email format"),
         first_name: z.string()
             .min(2, "First name must be at least 2 characters")
             .regex(REGEX.NAME, "Only alphabets are allowed in first name"),
@@ -20,8 +32,12 @@ export const patientSignupSchema = z.object({
         dob: z.string().refine((val) => {
             const birthDate = new Date(val);
             const today = new Date();
-            return birthDate < today;
-        }, "Date of birth cannot be in the future"),
+        
+            if (birthDate > today) return false;
+        
+            const age = calculateAge(val);
+            return age >= 0 && age <= 150;
+        }, "Age must be between 0 and 150 and DOB cannot be in the future"),
         verification_token: z.string().min(1, "Verification token is required"),
     }),
 });
@@ -48,7 +64,7 @@ export const verifyOtpSchema = z.object({
 
 export const doctorSignupSchema = z.object({
     body: z.object({
-        email: z.string().email("Invalid email format"),
+        email: z.string().regex(REGEX.EMAIL, "Invalid email format"),
         first_name: z.string()
             .min(2, "First name must be at least 2 characters")
             .regex(REGEX.NAME, "Only alphabets are allowed in first name"),
@@ -64,13 +80,17 @@ export const doctorSignupSchema = z.object({
         dob: z.string().refine((val) => {
             const birthDate = new Date(val);
             const today = new Date();
-            return birthDate < today;
-        }, "Date of birth cannot be in the future"),
+    
+            if (birthDate > today) return false;
+    
+            const age = calculateAge(val);
+            return age >= 22 && age <= 150;
+        }, "Doctor age must be between 22 and 150"),
         // Doctor specific
         qualifications: z.array(z.nativeEnum(Qualification)).min(1, "At least one qualification is required"),
-        experience: z.number().min(0, "Experience cannot be negative"),
+        experience: z.number().min(0, "Experience cannot be negative").max(128, "Experience cannot be more than 128 years"),
         specialties: z.array(z.nativeEnum(Specialty)).min(1, "At least one specialty is required"),
-        consultation_fee: z.number().min(10, "Fee must be at least 10"),
+        consultation_fee: z.number().min(10, "Fee must be at least 10").max(1000000, "Fee cannot be more than 1000000"),
         plan_name: z.enum(["ELITE", "PRO"], { message: "Invalid plan name" }),
         verification_token: z.string().min(1, "Verification token is required"),
     }),
