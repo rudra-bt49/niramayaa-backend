@@ -5,11 +5,14 @@ import { ApiResponse } from "../shared/utils/ApiResponse";
 export const validate = (schema: z.ZodTypeAny) => {
     return async (req: Request, res: Response, next: NextFunction) => {
         try {
-            await schema.parseAsync({
+            const validatedData = await schema.parseAsync({
                 body: req.body,
                 query: req.query,
                 params: req.params,
-            });
+            }) as { body: any; query: any; params: any };
+            
+            // Only re-assign body. query and params are read-only in Express 5
+            req.body = validatedData.body;
             next();
         } catch (error) {
             if (error instanceof ZodError) {
