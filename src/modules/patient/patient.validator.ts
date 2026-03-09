@@ -21,7 +21,15 @@ export const updatePatientProfileSchema = z.object({
         weight: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(2).max(500).optional()),
         
         blood_group: z.nativeEnum(BloodType).optional(),
-        allergies: z.string().optional(),
+        allergies: z.string()
+            .trim()
+            .max(200, "Allergies cannot exceed 200 characters")
+            .regex(/^[a-zA-Z\s,]+$/, "Allergies can only contain letters, spaces, and commas")
+            .refine((val) => {
+                const items = val.split(",").map(a => a.trim());
+                return items.every(a => a.length >= 2);
+            }, "Each allergy must be at least 2 characters")
+            .optional(),
         emergency_contact_name: z.string().optional(),
         emergency_contact_phone: z.string().regex(REGEX.PHONE, "Invalid emergency phone number format. Must be 10 digits").optional(),
 
