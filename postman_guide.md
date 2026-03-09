@@ -61,7 +61,7 @@ This guide walk you through testing the authentication flow using Postman.
 ## 4. Doctor Signup (Resilient Flow)
 
 ### Step 4.1: Initiate Signup
-**Endpoint**: `POST /api/auth/doctor-signup`  
+**Endpoint**: `POST /api/auth/signup-doctor`  
 **Body**:
 ```json
 {
@@ -88,7 +88,7 @@ This guide walk you through testing the authentication flow using Postman.
 2. Stripe will call your host's Webhook (use **Stripe CLI** to listen locally).
 
 ### Step 4.3: Auto-Login
-**Endpoint**: `POST /api/auth/doctor-signup/verify-session`  
+**Endpoint**: `POST /api/auth/signup-doctor/verify-session`  
 **Body**:
 ```json
 {
