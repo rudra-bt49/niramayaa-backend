@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
         userId: string;
         email: string;
         role: UserRole;
+        plan_name?: string;
     };
 }
 
@@ -31,6 +32,7 @@ export const authMiddleware = (allowedRoles?: UserRole[]) => {
                 userId: string;
                 email: string;
                 role: UserRole;
+                plan_name?: string;
             };
 
             req.user = decoded;
