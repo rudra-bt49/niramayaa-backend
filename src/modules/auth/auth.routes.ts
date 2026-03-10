@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authController } from "./auth.controller";
 import { validate } from "../../middlewares/validate.middleware";
-import { patientSignupSchema, loginSchema, sendOtpSchema, verifyOtpSchema, doctorSignupSchema, forgotPasswordSchema, resetPasswordSchema } from "./auth.validator";
+import { patientSignupSchema, loginSchema, sendOtpSchema, verifyOtpSchema, doctorSignupSchema, forgotPasswordSchema, resetPasswordSchema, validateSessionSchema, refreshTokenSchema } from "./auth.validator";
 import { API } from "../../shared/constants/api-routes";
 
 const router = Router();
@@ -51,6 +51,18 @@ router.post(
     API.AUTH.RESET_PASSWORD,
     validate(resetPasswordSchema),
     authController.resetPassword
+);
+
+router.post(
+    API.AUTH.VALIDATE_SESSION,
+    validate(validateSessionSchema),
+    authController.validateSession
+);
+
+router.post(
+    API.AUTH.REFRESH,
+    validate(refreshTokenSchema),
+    authController.refreshToken
 );
 
 export default router;

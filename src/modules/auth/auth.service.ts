@@ -8,10 +8,13 @@ import {
     IVerifyOtpRequest,
     IDoctorSignupRequest,
     IForgotPasswordRequest,
-    IResetPasswordRequest
+    IResetPasswordRequest,
+    IValidateSessionRequest,
+    IRefreshTokenRequest
 } from "./auth.types";
 import { UserRole } from "../../shared/constants/roles";
 import { tokenUtil } from "../../shared/utils/token.util";
+import { ITokenPayload } from "../../types/token.types";
 import { sessionService } from "./session.service";
 import { stripeService } from "../../shared/services/stripe.service";
 import { StripeConfig } from "../../config/stripe.config";
@@ -435,5 +438,89 @@ export const authService = {
                 data: { is_active: false },
             });
         });
+    },
+
+    validateSession: async (data: IValidateSessionRequest) => {
+        const { refreshToken } = data;
+        let decodedPayload;
+        let isExpired = false;
+
+        // Verify token expiry using jwt logic
+        try {
+            decodedPayload = tokenUtil.verifyRefreshToken(refreshToken);
+        } catch (error: any) {
+            if (error.name === "TokenExpiredError") {
+                isExpired = true;
+                // Decode without verification to get the payload (userId)
+                decodedPayload = require('jsonwebtoken').decode(refreshToken);
+                if (!decodedPayload) {
+                    const err: any = new Error("Invalid refresh token format");
+                    err.statusCode = 401;
+                    throw err;
+                }
+            } else {
+                const err: any = new Error("Invalid refresh token. Please Login");
+                err.statusCode = 401;
+                throw err;
+            }
+        }
+
+        const userId = decodedPayload.userId;
+        const hashOfProvidedToken = hashUtil.hashString(refreshToken);
+
+        // Fetch session from DB using user_id, token hash, and is_active: true
+        const session = await prisma.user_session.findFirst({
+            where: {
+                user_id: userId,
+                refresh_token_hash: hashOfProvidedToken,
+                is_active: true
+            }
+        });
+
+        if (!session) {
+            const error: any = new Error("You are logged in in other device");
+            error.statusCode = 401;
+            throw error;
+        }
+
+        if (isExpired) {
+            // Set is_active to false in DB
+            await prisma.user_session.update({
+                where: { id: session.id },
+                data: { is_active: false }
+            });
+
+            const err: any = new Error("Refresh token expired. Please Login");
+            err.statusCode = 401;
+            throw err;
+        }
+
+        return { message: "valid session" };
+    },
+
+    refreshToken: async (data: IRefreshTokenRequest) => {
+        const { refreshToken } = data;
+
+        // 1. Validate session
+        await authService.validateSession({ refreshToken });
+
+        // 2. Decode without any, it is strictly an ITokenPayload
+        const decoded = tokenUtil.verifyRefreshToken(refreshToken);
+
+        // 3. Create explicit payload based on requested types to strip potential `iat`/`exp` values from jwt.verify
+        const payload: ITokenPayload = {
+            userId: decoded.userId,
+            email: decoded.email,
+            role: decoded.role,
+        };
+
+        if (decoded.plan_name !== undefined) {
+            payload.plan_name = decoded.plan_name;
+        }
+
+        // 4. Generate the new token
+        const accessToken = tokenUtil.generateAccessToken(payload);
+
+        return { accessToken };
     }
 };
