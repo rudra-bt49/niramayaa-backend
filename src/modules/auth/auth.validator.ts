@@ -108,3 +108,15 @@ export const resetPasswordSchema = z.object({
         password: z.string().regex(REGEX.PASSWORD, "Password must be at least 8 characters, one uppercase, one lowercase, one number and one special character"),
     }),
 });
+
+export const validateSessionSchema = z.object({
+    body: z.object({
+        refreshToken: z.string().min(1, "Refresh token is required"),
+    }),
+});
+
+export const refreshTokenSchema = z.object({
+    body: z.object({
+        refreshToken: z.string().min(1, "Refresh token is required"),
+    }),
+});

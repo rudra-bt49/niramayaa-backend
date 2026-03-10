@@ -1,6 +1,6 @@
 import { IApiResponse } from "../../types/global.types";
 
-export class ApiResponse<T = any> {
+export class ApiResponse {
     static success<T>(data: T, message: string = "Success", statusCode: number = 200): IApiResponse<T> {
         return {
             success: true,
