@@ -3,4 +3,5 @@ export const REGEX = {
     PHONE: /^[6-9]\d{9}$/,
     PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
     EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    ALLERGIES: /^[a-zA-Z\s,]+$/,
 };

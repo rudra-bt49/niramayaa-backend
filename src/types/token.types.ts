@@ -2,6 +2,7 @@ export interface ITokenPayload {
     userId: string;
     email: string;
     role: string;
+    plan_name?: string;
 }
 
 export interface IVerificationOtpPayload {

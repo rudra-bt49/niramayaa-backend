@@ -257,7 +257,12 @@ export const authService = {
         // The user was created by the Webhook
         const user = await prisma.user.findUnique({
             where: { email },
-            include: { role: true }
+            include: { 
+                role: true,
+                doctor_profile: {
+                    include: { plan: true }
+                }
+            }
         });
 
         if (!user) {
@@ -267,11 +272,15 @@ export const authService = {
         }
 
         // Generate tokens
-        const payload = {
+        const payload: any = {
             userId: user.id,
             email: user.email,
             role: user.role.name,
         };
+
+        if (user.role.name === UserRole.DOCTOR && user.doctor_profile?.plan?.plan_name) {
+            payload.plan_name = user.doctor_profile.plan.plan_name;
+        }
 
         const accessToken = tokenUtil.generateAccessToken(payload);
         const refreshToken = tokenUtil.generateRefreshToken(payload);
@@ -298,7 +307,12 @@ export const authService = {
         // 1. Find User
         const user = await prisma.user.findUnique({
             where: { email },
-            include: { role: true },
+            include: { 
+                role: true,
+                doctor_profile: {
+                    include: { plan: true }
+                }
+            },
         });
 
         if (!user) {
@@ -329,11 +343,15 @@ export const authService = {
         }
 
         // 5. Generate Tokens
-        const payload = {
+        const payload: any = {
             userId: user.id,
             email: user.email,
             role: user.role.name,
         };
+
+        if (user.role.name === UserRole.DOCTOR && user.doctor_profile?.plan?.plan_name) {
+            payload.plan_name = user.doctor_profile.plan.plan_name;
+        }
 
         const accessToken = tokenUtil.generateAccessToken(payload);
         const refreshToken = tokenUtil.generateRefreshToken(payload);

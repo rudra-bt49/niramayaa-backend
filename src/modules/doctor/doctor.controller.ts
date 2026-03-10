@@ -3,6 +3,7 @@ import asyncHandler from 'express-async-handler';
 import { doctorService } from './doctor.service';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { ApiResponse } from '../../shared/utils/ApiResponse';
+import { IUpdateDoctorProfileRequest } from './doctor.profile.types';
 
 export const doctorController = {
     getProfile: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -24,7 +25,7 @@ export const doctorController = {
             return;
         }
 
-        const data = req.body;
+        const data = req.body as IUpdateDoctorProfileRequest;
         const file = req.file;
 
         const updatedProfile = await doctorService.updateProfile(userId, data, file);
