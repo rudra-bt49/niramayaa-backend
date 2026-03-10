@@ -16,6 +16,11 @@ export const API = {
         GET_DOCTOR_PROFILE: "/doctors/profile",
         GET_PATIENT_PROFILE: "/patients/profile",
     },
+    DOCTORS: "/doctors",
+    QRCODE: {
+        GET: '/qrcode',
+        REGENERATE: '/qrcode/regenerate'
+    },
     PAYMENT: {
         WEBHOOK: '/payments/webhook',
     },

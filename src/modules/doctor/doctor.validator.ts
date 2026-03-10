@@ -17,7 +17,7 @@ export const updateDoctorProfileSchema = z.object({
         phone_number: z.string().regex(REGEX.PHONE, "Invalid phone number format. Must be 10 digits").optional(),
         city: z.nativeEnum(IndianCity).optional(),
 
-        bio: z.string().min(20, "Bio must be at least 20 characters").max(500, "Bio must be at most 500 characters").optional(),
+        bio: z.preprocess((val) => (val === "" ? undefined : val), z.string().min(20, "Bio must be at least 20 characters").max(500, "Bio must be at most 500 characters").optional()),
         specialties: z.union([z.nativeEnum(Specialty).array().min(1, "At least one specialty is required"), z.string().transform((val) => {
             try { return JSON.parse(val); } catch { return [val]; }
         })]).optional(),
