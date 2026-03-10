@@ -16,10 +16,10 @@ export const updatePatientProfileSchema = z.object({
 
         // Height in cm
         height: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(30).max(300).optional()),
-        
+
         // Weight in kg
         weight: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(2).max(500).optional()),
-        
+
         blood_group: z.nativeEnum(BloodType).optional(),
         allergies: z.preprocess((val) => (val === "" ? undefined : val), z.string()
             .trim()
@@ -34,9 +34,9 @@ export const updatePatientProfileSchema = z.object({
         emergency_contact_phone: z.preprocess((val) => (val === "" ? undefined : val), z.string().regex(REGEX.PHONE, "Invalid emergency phone number format. Must be 10 digits").optional()),
 
         // Password reset block
-        old_password: z.string().optional(),
-        new_password: z.string().regex(REGEX.PASSWORD, "Password must be at least 8 characters, one uppercase, one lowercase, one number and one special character").min(8, "New password must be at least 8 characters").optional(),
-        confirm_new_password: z.string().optional(),
+        old_password: z.preprocess((val) => (val === "" ? undefined : val), z.string().optional()),
+        new_password: z.preprocess((val) => (val === "" ? undefined : val), z.string().regex(REGEX.PASSWORD, "Password must be at least 8 characters, one uppercase, one lowercase, one number and one special character").min(8, "New password must be at least 8 characters").optional()),
+        confirm_new_password: z.preprocess((val) => (val === "" ? undefined : val), z.string().optional()),
     }).refine((data) => {
         if (data.new_password || data.confirm_new_password) {
             return data.new_password === data.confirm_new_password;

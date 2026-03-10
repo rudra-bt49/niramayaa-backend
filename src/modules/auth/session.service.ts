@@ -33,13 +33,14 @@ export const sessionService = {
     /**
      * Creates a new session for a user.
      */
-    createSession: async (userId: string, refreshToken: string, deviceName?: string): Promise<void> => {
+    createSession: async (userId: string, refreshToken: string, deviceId?: string, deviceName?: string): Promise<void> => {
         const refreshTokenHash = hashUtil.hashString(refreshToken);
 
         await prisma.user_session.create({
             data: {
                 user_id: userId,
                 refresh_token_hash: refreshTokenHash,
+                device_id: deviceId,
                 device_name: deviceName || "Unknown Device",
                 is_active: true,
             },

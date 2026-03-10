@@ -3,15 +3,29 @@ import asyncHandler from "express-async-handler";
 import { authService } from "./auth.service";
 import { ApiResponse } from "../../shared/utils/ApiResponse";
 
+import { hashUtil } from "../../shared/utils/hash.util";
+
+const getDeviceInfo = (req: Request) => {
+    const ua = (req as any).useragent;
+    if (!ua) return { deviceId: "unknown", deviceName: "Unknown Device" };
+
+    const deviceName = `${ua.browser} ${ua.version} on ${ua.os} (${ua.platform})`;
+    // Create a stable device ID by hashing the user-agent string
+    const deviceId = hashUtil.hashString(req.headers['user-agent'] || "unknown");
+
+    return { deviceId, deviceName };
+};
+
 export const authController = {
     signupPatient: asyncHandler(async (req: Request, res: Response) => {
-        const result = await authService.patientSignup(req.body);
+        const { deviceId, deviceName } = getDeviceInfo(req);
+        const result = await authService.patientSignup(req.body, deviceId, deviceName);
 
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -42,13 +56,14 @@ export const authController = {
     }),
 
     login: asyncHandler(async (req: Request, res: Response) => {
-        const result = await authService.login(req.body);
+        const { deviceId, deviceName } = getDeviceInfo(req);
+        const result = await authService.login(req.body, deviceId, deviceName);
 
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -78,13 +93,14 @@ export const authController = {
             return;
         }
 
-        const result = await authService.verifyDoctorPaymentSession(session_id);
+        const { deviceId, deviceName } = getDeviceInfo(req);
+        const result = await authService.verifyDoctorPaymentSession(session_id, deviceId, deviceName);
 
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -123,7 +139,12 @@ export const authController = {
     }),
 
     validateSession: asyncHandler(async (req: Request, res: Response) => {
-        const result = await authService.validateSession(req.body);
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            res.status(401).json(ApiResponse.error("Session expired or missing. Please Login", 401));
+            return;
+        }
+        const result = await authService.validateSession(refreshToken);
         res.status(200).json(
             ApiResponse.success(
                 null,
@@ -134,7 +155,12 @@ export const authController = {
     }),
 
     refreshToken: asyncHandler(async (req: Request, res: Response) => {
-        const result = await authService.refreshToken(req.body);
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            res.status(401).json(ApiResponse.error("Session expired or missing. Please Login", 401));
+            return;
+        }
+        const result = await authService.refreshToken(refreshToken);
         res.status(200).json(
             ApiResponse.success(
                 result,

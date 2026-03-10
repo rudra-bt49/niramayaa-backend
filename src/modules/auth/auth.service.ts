@@ -72,7 +72,7 @@ export const authService = {
         }
     },
 
-    patientSignup: async (data: IPatientSignupRequest) => {
+    patientSignup: async (data: IPatientSignupRequest, deviceId?: string, deviceName?: string) => {
         const { email, first_name, last_name, phone_number, password, gender, city, dob, verification_token } = data;
 
         // 0. Verify the "Success Hall Pass" token
@@ -150,7 +150,7 @@ export const authService = {
         const refreshToken = tokenUtil.generateRefreshToken(payload);
 
         // 6. Create Session
-        await sessionService.createSession(newUser.id, refreshToken);
+        await sessionService.createSession(newUser.id, refreshToken, deviceId, deviceName);
 
         return {
             user: {
@@ -240,7 +240,7 @@ export const authService = {
         };
     },
 
-    verifyDoctorPaymentSession: async (sessionId: string) => {
+    verifyDoctorPaymentSession: async (sessionId: string, deviceId?: string, deviceName?: string) => {
         if (!process.env.STRIPE_SECRET_KEY) {
             throw new Error('STRIPE_SECRET_KEY is missing');
         }
@@ -260,7 +260,7 @@ export const authService = {
         // The user was created by the Webhook
         const user = await prisma.user.findUnique({
             where: { email },
-            include: { 
+            include: {
                 role: true,
                 doctor_profile: {
                     include: { plan: true }
@@ -289,7 +289,7 @@ export const authService = {
         const refreshToken = tokenUtil.generateRefreshToken(payload);
 
         // Store session
-        await sessionService.createSession(user.id, refreshToken);
+        await sessionService.createSession(user.id, refreshToken, deviceId, deviceName);
 
         return {
             user: {
@@ -304,13 +304,13 @@ export const authService = {
         };
     },
 
-    login: async (data: ILoginRequest) => {
+    login: async (data: ILoginRequest, deviceId?: string, deviceName?: string) => {
         const { email, password, forceLogout } = data;
 
         // 1. Find User
         const user = await prisma.user.findUnique({
             where: { email },
-            include: { 
+            include: {
                 role: true,
                 doctor_profile: {
                     include: { plan: true }
@@ -360,7 +360,7 @@ export const authService = {
         const refreshToken = tokenUtil.generateRefreshToken(payload);
 
         // 6. Create Session
-        await sessionService.createSession(user.id, refreshToken);
+        await sessionService.createSession(user.id, refreshToken, deviceId, deviceName);
 
         return {
             user: {
@@ -440,8 +440,7 @@ export const authService = {
         });
     },
 
-    validateSession: async (data: IValidateSessionRequest) => {
-        const { refreshToken } = data;
+    validateSession: async (refreshToken: string) => {
         let decodedPayload;
         let isExpired = false;
 
@@ -498,11 +497,9 @@ export const authService = {
         return { message: "valid session" };
     },
 
-    refreshToken: async (data: IRefreshTokenRequest) => {
-        const { refreshToken } = data;
-
+    refreshToken: async (refreshToken: string) => {
         // 1. Validate session
-        await authService.validateSession({ refreshToken });
+        await authService.validateSession(refreshToken);
 
         // 2. Decode without any, it is strictly an ITokenPayload
         const decoded = tokenUtil.verifyRefreshToken(refreshToken);
