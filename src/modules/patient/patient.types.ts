@@ -1,4 +1,5 @@
 import { IndianCity, Gender, BloodType, patient_profile } from '@prisma/client';
+import { slot_status } from '../../shared/constants/slot-status';
 
 export interface IUpdatePatientProfileRequest {
     first_name?: string;
@@ -31,4 +32,22 @@ export interface IUpdatePatientProfileResponse {
     created_at: Date;
     updated_at: Date;
     patient_profile: patient_profile | null;
+}
+
+
+export interface ISlot {
+    start_time: Date | null;
+    end_time: Date | null;
+    status: slot_status;
+}
+
+export interface IDayAvailability {
+    date: string;
+    is_active: boolean;
+    slots: ISlot[];
+    start_time?: Date | null;
+    end_time?: Date | null;
+    break_start_time?: Date | null;
+    break_end_time?: Date | null;
+    slot_duration?: number;
 }

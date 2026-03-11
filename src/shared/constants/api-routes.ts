@@ -27,6 +27,7 @@ export const API = {
     DOCTORS: "/doctors",
     DOCTOR_EXTRA: {
         GET_AVAILABILITY: '/availability',
+        EDIT_AVAILABILITY: '/availability/edit',
     },
     QRCODE: {
         GET: '/qrcode',
