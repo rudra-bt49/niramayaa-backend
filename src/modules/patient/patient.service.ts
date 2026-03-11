@@ -6,6 +6,29 @@ import { IUpdatePatientProfileRequest, IUpdatePatientProfileResponse } from './p
 import { IGetDoctorsQuery } from './patient.validator';
 import { Prisma, Specialty, Qualification } from '@prisma/client';
 import { convertUtcToIstDate, generateSlots } from '../../shared/utils/timezone';
+import { doctor_plan } from '../../shared/constants/doctor-plan';
+import { UserRole } from '../../shared/constants/roles';
+
+interface HttpError extends Error {
+    statusCode?: number;
+}
+
+interface ISlot {
+    start_time: Date | null;
+    end_time: Date | null;
+    status: string;
+}
+
+interface IDayAvailability {
+    date: string;
+    is_active: boolean;
+    slots: ISlot[];
+    start_time?: Date | null;
+    end_time?: Date | null;
+    break_start_time?: Date | null;
+    break_end_time?: Date | null;
+    slot_duration?: number;
+}
 
 export const patientService = {
     getProfile: async (userId: string): Promise<IUpdatePatientProfileResponse | null> => {
@@ -15,7 +38,7 @@ export const patientService = {
         });
 
         if (!user) {
-            const error: any = new Error("User not found");
+            const error: HttpError = new Error("User not found");
             error.statusCode = 404;
             throw error;
         }
@@ -37,7 +60,7 @@ export const patientService = {
         });
 
         if (!user) {
-            const error: any = new Error("User not found");
+            const error: HttpError = new Error("User not found");
             error.statusCode = 404;
             throw error;
         }
@@ -47,7 +70,7 @@ export const patientService = {
         if (data.old_password && data.new_password) {
             const isPasswordMatch = await bcrypt.compare(data.old_password, user.password_hash);
             if (!isPasswordMatch) {
-                const error: any = new Error("Invalid old password");
+                const error: HttpError = new Error("Invalid old password");
                 error.statusCode = 400;
                 throw error;
             }
@@ -197,7 +220,7 @@ export const patientService = {
         }
 
         const userWhere: Prisma.userWhereInput = {
-            role: { name: 'DOCTOR' }
+            role: { name:  UserRole.DOCTOR}
         };
 
         if (locations && locations.length > 0) {
@@ -213,7 +236,7 @@ export const patientService = {
 
         // Only PRO plan doctors should be visible to patients
         where.plan = {
-            plan_name: 'PRO'
+            plan_name: doctor_plan.PRO
         };
 
         // 3. Min Rating
@@ -314,21 +337,21 @@ export const patientService = {
         });
 
         if (!doctorExists) {
-            const error: any = new Error("Doctor not found");
+            const error: HttpError = new Error("Doctor not found");
             error.statusCode = 404;
             throw error;
         }
 
-        if (currentUser?.role === 'DOCTOR') {
+        if (currentUser?.role === UserRole.DOCTOR) {
             if (currentUser.userId !== doctorId) {
-                const error: any = new Error("Doctors can only view their own availability");
+                const error: HttpError = new Error("Doctors can only view their own availability");
                 error.statusCode = 403;
                 throw error;
             }
         } else {
             // PATIENT role checking
-            if (doctorExists.plan?.plan_name !== 'PRO') {
-                const error: any = new Error("Only PRO plan doctors have slot-based availability");
+            if (doctorExists.plan?.plan_name !== doctor_plan.PRO) {
+                const error: HttpError = new Error("Only PRO plan doctors have slot-based availability");
                 error.statusCode = 403;
                 throw error;
             }
@@ -371,7 +394,7 @@ export const patientService = {
         ]);
 
         // Process availability into mapped days
-        const responseMap = new Map<string, any>();
+        const responseMap = new Map<string, IDayAvailability>();
 
         availabilityRecords.forEach(record => {
             // First generate the UTC slots excluding break time
@@ -388,13 +411,13 @@ export const patientService = {
             const dateStr = istStartAt.toISOString().split('T')[0];
 
             if (!responseMap.has(dateStr)) {
-                const dayData: any = {
+                const dayData: IDayAvailability = {
                     date: dateStr,
                     is_active: record.is_active,
                     slots: []
                 };
 
-                if (currentUser?.role === 'DOCTOR' && currentUser.userId === doctorId) {
+                if (currentUser?.role === UserRole.DOCTOR && currentUser.userId === doctorId) {
                     dayData.start_time = convertUtcToIstDate(record.start_at);
                     dayData.end_time = convertUtcToIstDate(record.end_at);
                     dayData.break_start_time = record.break_start ? convertUtcToIstDate(record.break_start) : null;
@@ -405,7 +428,7 @@ export const patientService = {
                 responseMap.set(dateStr, dayData);
             }
 
-            const dayRecord = responseMap.get(dateStr);
+            const dayRecord = responseMap.get(dateStr)!;
 
             // Map each slot check against booked appointments and format returned times to IST
             slots.forEach(slot => {

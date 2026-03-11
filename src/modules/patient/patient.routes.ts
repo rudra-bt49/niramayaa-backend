@@ -25,7 +25,7 @@ router.put(
 
 router.get(
     API.COMMON.GET_DOCTORS,
-    authMiddleware([UserRole.PATIENT, UserRole.DOCTOR]),
+    authMiddleware([UserRole.PATIENT]),
     validate(getDoctorsQuerySchema),
     patientController.getDoctors
 );
