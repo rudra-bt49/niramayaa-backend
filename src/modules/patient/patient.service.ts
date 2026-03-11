@@ -8,6 +8,8 @@ import { Prisma, Specialty, Qualification } from '@prisma/client';
 import { convertUtcToIstDate, generateSlots } from '../../shared/utils/timezone';
 import { doctor_plan } from '../../shared/constants/doctor-plan';
 import { UserRole } from '../../shared/constants/roles';
+import { appointment_status } from '../../shared/constants/appointment-status';
+import { slot_status } from '../../shared/constants/slot-status';
 
 interface HttpError extends Error {
     statusCode?: number;
@@ -16,7 +18,7 @@ interface HttpError extends Error {
 interface ISlot {
     start_time: Date | null;
     end_time: Date | null;
-    status: string;
+    status: slot_status;
 }
 
 interface IDayAvailability {
@@ -220,7 +222,7 @@ export const patientService = {
         }
 
         const userWhere: Prisma.userWhereInput = {
-            role: { name:  UserRole.DOCTOR}
+            role: { name: UserRole.DOCTOR }
         };
 
         if (locations && locations.length > 0) {
@@ -382,7 +384,7 @@ export const patientService = {
                         lte: thirtyDaysFromNowUtc
                     },
                     status: {
-                        in: ['SCHEDULED', 'COMPLETED']
+                        in: [appointment_status.SCHEDULED, appointment_status.COMPLETED]
                     }
                 },
                 select: {
@@ -443,10 +445,11 @@ export const patientService = {
                     return appStart < slotEnd && appEnd > slotStart;
                 });
 
-                let slotStatus = "AVAILABLE";
-                if (overlappingAppointment && ['SCHEDULED', 'COMPLETED'].includes(overlappingAppointment.status)) {
-                    slotStatus = "BOOKED";
+                let slotStatus = slot_status.AVAILABLE;
+                if (overlappingAppointment && [appointment_status.SCHEDULED, appointment_status.COMPLETED].includes(overlappingAppointment.status as unknown as appointment_status)) {
+                    slotStatus = slot_status.BOOKED;
                 }
+
 
                 dayRecord.slots.push({
                     start_time: convertUtcToIstDate(slot.start_time),
