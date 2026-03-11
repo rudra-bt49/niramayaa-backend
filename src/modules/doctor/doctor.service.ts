@@ -16,7 +16,8 @@ export const doctorService = {
             throw error;
         }
 
-        (user as any).password_hash = undefined;
+        const safeUser = user as { password_hash?: string };
+        safeUser.password_hash = undefined;
         return user;
     },
 
@@ -67,7 +68,7 @@ export const doctorService = {
 
         // 4. Update Profile in Transaction
         const updatedUser = await prisma.$transaction(async (tx) => {
-            const userUpdateData: any = {
+            const userUpdateData: Record<string, string | null> = {
                 password_hash: updatedPasswordHash,
                 profile_image,
                 profile_image_public_id
@@ -83,7 +84,7 @@ export const doctorService = {
                 data: userUpdateData
             });
 
-            const doctorUpdateData: any = {};
+            const doctorUpdateData: Record<string, string | number | string[] | null> = {};
             if (data.bio !== undefined) doctorUpdateData.bio = data.bio;
             if (data.experience !== undefined) doctorUpdateData.experience = data.experience;
             if (data.consultation_fee !== undefined) doctorUpdateData.consultation_fee = data.consultation_fee;
@@ -114,9 +115,72 @@ export const doctorService = {
         });
 
         if (updatedUser) {
-            (updatedUser as any).password_hash = undefined;
+            const safeUpdated = updatedUser as { password_hash?: string };
+            safeUpdated.password_hash = undefined;
         }
 
         return updatedUser;
+    },
+
+    createDefaultAvailability: async (doctorId: string) => {
+        // Prevent duplicate availability creation
+        const existing = await prisma.availability.findFirst({
+            where: { doctor_id: doctorId }
+        });
+        if (existing) return;
+
+        const availabilities = [];
+        const slot_duration = 20;
+        
+        // Queue capacity: 9 AM to 1 PM (4 hrs, 12 slots) + 2 PM to 5 PM (3 hrs, 9 slots) = 21 slots.
+        const queue_capacity = 21;
+
+        const now = new Date();
+        let daysAdded = 0;
+        let dayOffset = 0;
+
+        while (daysAdded < 30) {
+            const targetDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+            
+            // Convert to IST (UTC + 5:30) to reliably check day of week
+            const istTime = new Date(targetDate.getTime() + (5.5 * 60 * 60 * 1000));
+            const dayOfWeek = istTime.getUTCDay(); // 0 is Sunday
+            
+            const year = istTime.getUTCFullYear();
+            const month = istTime.getUTCMonth();
+            const date = istTime.getUTCDate();
+
+            // Helper to create UTC Date matching the expected IST hour and minute
+            const createUtcFromIst = (hour: number, minute: number) => {
+                const tempIst = new Date(Date.UTC(year, month, date, hour, minute, 0, 0));
+                return new Date(tempIst.getTime() - (5.5 * 60 * 60 * 1000));
+            };
+
+            const start_at = createUtcFromIst(9, 0); // 9:00 AM IST -> 03:30 UTC
+            const end_at = createUtcFromIst(17, 0); // 5:00 PM IST -> 11:30 UTC
+            const break_start = createUtcFromIst(13, 0); // 1:00 PM IST -> 07:30 UTC
+            const break_end = createUtcFromIst(14, 0); // 2:00 PM IST -> 08:30 UTC
+
+            availabilities.push({
+                doctor_id: doctorId,
+                start_at,
+                end_at,
+                break_start,
+                break_end,
+                slot_duration,
+                is_active: dayOfWeek !== 0, // False on Sundays
+                queue_capacity
+            });
+            
+            daysAdded++;
+            dayOffset++;
+        }
+
+        if (availabilities.length > 0) {
+            await prisma.availability.createMany({
+                data: availabilities,
+                skipDuplicates: true
+            });
+        }
     }
 };

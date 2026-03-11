@@ -16,7 +16,8 @@ export const patientService = {
             throw error;
         }
 
-        (user as any).password_hash = undefined;
+        const safeUser = user as { password_hash?: string };
+        safeUser.password_hash = undefined;
         return user;
     },
 
@@ -70,7 +71,7 @@ export const patientService = {
         // 4. Update Profile in Transaction
         const updatedUser = await prisma.$transaction(async (tx) => {
             // Update User Base Table
-            const userUpdateData: any = {
+            const userUpdateData: Record<string, string | null> = {
                 password_hash: updatedPasswordHash,
                 profile_image,
                 profile_image_public_id
@@ -87,7 +88,7 @@ export const patientService = {
             });
 
             // Update Patient Profile Table
-            const patientUpdateData: any = {};
+            const patientUpdateData: Record<string, string | number | null> = {};
             if (data.height !== undefined) patientUpdateData.height = data.height;
             if (data.weight !== undefined) patientUpdateData.weight = data.weight;
             if (data.blood_group) patientUpdateData.blood_group = data.blood_group;
@@ -117,7 +118,8 @@ export const patientService = {
 
         // Strip sensitive info before returning
         if (updatedUser) {
-            (updatedUser as any).password_hash = undefined;
+            const safeUpdated = updatedUser as { password_hash?: string };
+            safeUpdated.password_hash = undefined;
         }
 
         return updatedUser;

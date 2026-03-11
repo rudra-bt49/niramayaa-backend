@@ -1,10 +1,11 @@
 import multer from 'multer';
+import { Request } from 'express';
 
 // Use memory storage so we can stream the buffer directly to Cloudinary
 const storage = multer.memoryStorage();
 
 // Accept only images
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {

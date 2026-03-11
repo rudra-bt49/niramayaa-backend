@@ -1,4 +1,5 @@
 import prisma from "../../prisma/prisma";
+import Stripe from 'stripe';
 import { stripeService } from "../../shared/services/stripe.service";
 import emailService from "../../shared/services/email.service";
 import { UserRole } from "../../shared/constants/roles";
@@ -21,7 +22,7 @@ export const paymentService = {
         // Handle the event
         switch (event.type) {
             case 'checkout.session.completed':
-                await handleCompletedSubscription(event.data.object as any);
+                await handleCompletedSubscription(event.data.object as Stripe.Checkout.Session);
                 break;
             case 'checkout.session.expired':
                 console.log(`⚠️ Webhook: Session ${event.data.object.id} expired. Registration abandoned.`);
@@ -37,7 +38,7 @@ export const paymentService = {
     }
 };
 
-async function handleCompletedSubscription(session: any) {
+async function handleCompletedSubscription(session: Stripe.Checkout.Session) {
     const { registration_type, email, first_name, last_name, phone_number, password_hash, gender, city, dob, qualifications, experience, specialties, consultation_fee, plan_name } = session.metadata || {};
 
     if (registration_type !== 'DOCTOR_SIGNUP') {
@@ -99,8 +100,8 @@ async function handleCompletedSubscription(session: any) {
             // 5. Fetch expanded session to get receipt_url (optional but good)
             try {
                 const expandedSession = await stripeService.getSessionDetails(session.id);
-                const paymentIntent = expandedSession.payment_intent as any;
-                receipt_url = paymentIntent?.latest_charge?.receipt_url || null;
+                const paymentIntent = expandedSession.payment_intent as Stripe.PaymentIntent;
+                receipt_url = paymentIntent?.latest_charge ? (paymentIntent.latest_charge as any).receipt_url : null;
             } catch (err) {
                 console.warn("⚠️ Webhook: Could not fetch receipt_url", err);
             }
@@ -110,8 +111,8 @@ async function handleCompletedSubscription(session: any) {
                 data: {
                     doctor_id: user.id,
                     plan_id: plan.id,
-                    amount: session.amount_total / 100,
-                    currency: session.currency,
+                    amount: (session.amount_total || 0) / 100,
+                    currency: session.currency || 'inr',
                     payment_method: session.payment_method_types?.[0] || 'card',
                     payment_status: session.payment_status,
                     stripe_session_id: session.id,
@@ -131,7 +132,7 @@ async function handleCompletedSubscription(session: any) {
                 user.email,
                 user.first_name,
                 plan.plan_name,
-                session.amount_total / 100,
+                (session.amount_total || 0) / 100,
                 receipt_url
             ).catch(err => {
                 console.error("⚠️ Webhook: Failed to send invoice email", err);

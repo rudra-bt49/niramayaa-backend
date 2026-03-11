@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-    apiVersion: '2025-01-27.acacia' as any, // Using latest stable
+    apiVersion: '2025-01-27.acacia' as '2026-02-25.clover',
 });
 
 class StripeService {

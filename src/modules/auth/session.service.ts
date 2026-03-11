@@ -36,14 +36,41 @@ export const sessionService = {
     createSession: async (userId: string, refreshToken: string, deviceId?: string, deviceName?: string): Promise<void> => {
         const refreshTokenHash = hashUtil.hashString(refreshToken);
 
-        await prisma.user_session.create({
-            data: {
+        await prisma.user_session.createMany({
+            data: [{
                 user_id: userId,
                 refresh_token_hash: refreshTokenHash,
                 device_id: deviceId,
                 device_name: deviceName || "Unknown Device",
                 is_active: true,
-            },
+            }],
+            skipDuplicates: true
+        });
+    },
+
+    /**
+     * Invalidates a specific session matching the user and their exact refresh token hash.
+     */
+    invalidateSession: async (userId: string, refreshToken: string): Promise<void> => {
+        const refreshTokenHash = hashUtil.hashString(refreshToken);
+
+        const session = await prisma.user_session.findFirst({
+            where: {
+                user_id: userId,
+                refresh_token_hash: refreshTokenHash,
+                is_active: true
+            }
+        });
+
+        if (!session) {
+            const error: any = new Error("Session not found or already logged out");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        await prisma.user_session.update({
+            where: { id: session.id },
+            data: { is_active: false }
         });
     },
 
