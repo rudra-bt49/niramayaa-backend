@@ -5,8 +5,10 @@ import { ApiResponse } from "../../shared/utils/ApiResponse";
 
 import { hashUtil } from "../../shared/utils/hash.util";
 
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
 const getDeviceInfo = (req: Request) => {
-    const ua = (req as any).useragent;
+    const ua = (req as Request & { useragent?: { browser: string; version: string; os: string; platform: string } }).useragent;
     if (!ua) return { deviceId: "unknown", deviceName: "Unknown Device" };
 
     const deviceName = `${ua.browser} ${ua.version} on ${ua.os} (${ua.platform})`;
@@ -165,6 +167,35 @@ export const authController = {
             ApiResponse.success(
                 result,
                 "Access token regenerated successfully",
+                200
+            )
+        );
+    }),
+
+    logout: asyncHandler(async (req: Request, res: Response) => {
+        // req.user is populated by the authMiddleware guaranteeing the access_token is valid
+        const userId = (req as AuthRequest).user?.userId;
+        const refreshToken = req.cookies?.refreshToken;
+
+        if (!userId || !refreshToken) {
+            res.status(401).json(ApiResponse.error("Invalid session. Cannot process logout", 401));
+            return;
+        }
+
+        await authService.logout(userId, refreshToken);
+
+        // Clear the refresh token cookie on the client side
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/'
+        });
+
+        res.status(200).json(
+            ApiResponse.success(
+                null,
+                "Logout successful",
                 200
             )
         );

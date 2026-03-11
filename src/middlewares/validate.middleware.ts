@@ -9,7 +9,11 @@ export const validate = (schema: z.ZodTypeAny) => {
                 body: req.body,
                 query: req.query,
                 params: req.params,
-            }) as { body: any; query: any; params: any };
+            }) as { 
+                body: Record<string, string | number | boolean | object | null | undefined>; 
+                query: Record<string, string | number | boolean | object | null | undefined>; 
+                params: Record<string, string | number | boolean | object | null | undefined>; 
+            };
             
             // Only re-assign body. query and params are read-only in Express 5
             req.body = validatedData.body;

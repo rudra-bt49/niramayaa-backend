@@ -20,6 +20,7 @@ import { stripeService } from "../../shared/services/stripe.service";
 import { StripeConfig } from "../../config/stripe.config";
 import { hashUtil } from "../../shared/utils/hash.util";
 import emailService from "../../shared/services/email.service";
+import { doctorService } from "../doctor/doctor.service";
 
 export const authService = {
     sendVerificationOtp: async (data: ISendVerificationOtpRequest) => {
@@ -275,7 +276,7 @@ export const authService = {
         }
 
         // Generate tokens
-        const payload: any = {
+        const payload: { userId: string; email: string; role: string; plan_name?: string } = {
             userId: user.id,
             email: user.email,
             role: user.role.name,
@@ -287,6 +288,9 @@ export const authService = {
 
         const accessToken = tokenUtil.generateAccessToken(payload);
         const refreshToken = tokenUtil.generateRefreshToken(payload);
+
+        // Create default 30-day availability
+        await doctorService.createDefaultAvailability(user.id);
 
         // Store session
         await sessionService.createSession(user.id, refreshToken, deviceId, deviceName);
@@ -346,7 +350,7 @@ export const authService = {
         }
 
         // 5. Generate Tokens
-        const payload: any = {
+        const payload: { userId: string; email: string; role: string; plan_name?: string } = {
             userId: user.id,
             email: user.email,
             role: user.role.name,
@@ -519,5 +523,15 @@ export const authService = {
         const accessToken = tokenUtil.generateAccessToken(payload);
 
         return { accessToken };
+    },
+
+    logout: async (userId: string, refreshToken: string) => {
+        if (!userId || !refreshToken) {
+            const error: any = new Error("Invalid request parameters for logout");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        await sessionService.invalidateSession(userId, refreshToken);
     }
 };

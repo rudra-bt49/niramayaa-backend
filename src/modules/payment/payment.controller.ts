@@ -11,7 +11,7 @@ export const paymentController = {
             return;
         }
 
-        const result = await paymentService.handleWebhook((req as any).rawBody, sig);
+        const result = await paymentService.handleWebhook((req as Request & { rawBody: Buffer }).rawBody, sig);
         res.status(200).json(result);
     })
 };

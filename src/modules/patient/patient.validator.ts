@@ -5,9 +5,9 @@ import { REGEX } from '../../shared/constants/regex.constants';
 export const updatePatientProfileSchema = z.object({
     body: z.object({
         // Non-editable fields explicitly rejected
-        email: z.any().refine((val) => val === undefined, "email is not editable").optional(),
-        gender: z.any().refine((val) => val === undefined, "gender is not editable").optional(),
-        dob: z.any().refine((val) => val === undefined, "dob is not editable").optional(),
+        email: z.string().optional().refine((val) => val === undefined, "email is not editable"),
+        gender: z.string().optional().refine((val) => val === undefined, "gender is not editable"),
+        dob: z.string().optional().refine((val) => val === undefined, "dob is not editable"),
 
         first_name: z.string().regex(REGEX.NAME, "Only alphabets are allowed in first name").min(2, "First name must be at least 2 characters").optional(),
         last_name: z.string().regex(REGEX.NAME, "Only alphabets are allowed in last name").min(2, "Last name must be at least 2 characters").optional(),
