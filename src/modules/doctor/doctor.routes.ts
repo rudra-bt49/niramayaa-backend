@@ -23,4 +23,10 @@ router.put(
     doctorController.updateProfile
 );
 
+router.get(
+    API.DOCTOR_EXTRA.GET_AVAILABILITY,
+    authMiddleware([UserRole.DOCTOR]),
+    doctorController.getAvailability
+);
+
 export default router;

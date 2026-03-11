@@ -11,7 +11,7 @@ const router = Router();
 router.use(authRoutes);
 router.use(paymentRoutes);
 router.use(patientRoutes);
-router.use(doctorRoutes);
+router.use(API.DOCTORS, doctorRoutes);
 router.use(API.DOCTORS, qrcodeRoutes);
 
 export default router;

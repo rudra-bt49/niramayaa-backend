@@ -2,6 +2,7 @@ import prisma from '../../prisma/prisma';
 import bcrypt from 'bcrypt';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { IUpdateDoctorProfileRequest, IUpdateDoctorProfileResponse } from './doctor.profile.types';
+import { convertUtcToIstDate } from '../../shared/utils/timezone';
 
 export const doctorService = {
     getProfile: async (userId: string): Promise<IUpdateDoctorProfileResponse | null> => {
@@ -57,7 +58,7 @@ export const doctorService = {
 
         if (file) {
             const uploadResult = await cloudinaryService.uploadImageStream(file.buffer, 'niramayaa/profiles/doctors');
-            
+
             if (user.profile_image_public_id) {
                 await cloudinaryService.deleteImage(user.profile_image_public_id);
             }
@@ -88,7 +89,7 @@ export const doctorService = {
             if (data.bio !== undefined) doctorUpdateData.bio = data.bio;
             if (data.experience !== undefined) doctorUpdateData.experience = data.experience;
             if (data.consultation_fee !== undefined) doctorUpdateData.consultation_fee = data.consultation_fee;
-            
+
             // Handle arrays which might come as strings from FormData
             if (data.specialties) {
                 doctorUpdateData.specialties = Array.isArray(data.specialties) ? data.specialties : JSON.parse(data.specialties);
@@ -120,6 +121,75 @@ export const doctorService = {
         }
 
         return updatedUser;
+    },
+
+    getAvailability: async (doctorId: string) => {
+        const doctorExists = await prisma.doctor_profile.findUnique({
+            where: { user_id: doctorId },
+            include: { plan: true }
+        });
+
+        if (!doctorExists) {
+            const error: any = new Error("Doctor not found");
+            error.statusCode = 404;
+            throw error;
+        }
+
+
+        const nowUtc = new Date();
+        const thirtyDaysFromNowUtc = new Date(nowUtc.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        const availabilityRecords = await prisma.availability.findMany({
+            where: {
+                doctor_id: doctorId,
+                start_at: {
+                    gte: nowUtc,
+                    lte: thirtyDaysFromNowUtc
+                }
+            },
+            orderBy: {
+                start_at: 'asc'
+            }
+        });
+
+        const availabilities = availabilityRecords.map(record => {
+            const istStartAt = convertUtcToIstDate(record.start_at)!;
+            const istEndAt = convertUtcToIstDate(record.end_at)!;
+            const dateStr = istStartAt.toISOString().split('T')[0];
+            
+            let breakDurationMs = 0;
+            let istBreakStartAt = null;
+            let istBreakEndAt = null;
+
+            if (record.break_start && record.break_end) {
+                breakDurationMs = record.break_end.getTime() - record.break_start.getTime();
+                istBreakStartAt = convertUtcToIstDate(record.break_start);
+                istBreakEndAt = convertUtcToIstDate(record.break_end);
+            }
+
+            const totalDurationMs = record.end_at.getTime() - record.start_at.getTime();
+            const activeDurationMs = totalDurationMs - breakDurationMs;
+            
+            // Generate total_slots based on net active duration / slot interval
+            const slotDurationMs = record.slot_duration * 60 * 1000;
+            const totalSlots = Math.floor(activeDurationMs / slotDurationMs);
+
+            return {
+                date: dateStr,
+                start_at: istStartAt,
+                end_at: istEndAt,
+                break_start: istBreakStartAt,
+                break_end: istBreakEndAt,
+                slot_duration: record.slot_duration,
+                is_active: record.is_active,
+                total_slots: totalSlots
+            };
+        });
+
+        return {
+            doctor_id: doctorId,
+            availabilities
+        };
     },
 
     createDefaultAvailability: async (doctorId: string) => {

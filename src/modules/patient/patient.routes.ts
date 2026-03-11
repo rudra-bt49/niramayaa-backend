@@ -4,7 +4,7 @@ import { authMiddleware } from '../../middlewares/auth.middleware';
 import { upload } from '../../middlewares/upload.middleware';
 import { UserRole } from '../../shared/constants/roles';
 import { validate } from '../../middlewares/validate.middleware';
-import { updatePatientProfileSchema } from './patient.validator';
+import { updatePatientProfileSchema, getDoctorsQuerySchema, getDoctorAvailabilitySchema } from './patient.validator';
 import { API } from '../../shared/constants/api-routes';
 
 const router = Router();
@@ -21,6 +21,20 @@ router.put(
     upload.single('profile_image'),
     validate(updatePatientProfileSchema),
     patientController.updateProfile
+);
+
+router.get(
+    API.COMMON.GET_DOCTORS,
+    authMiddleware([UserRole.PATIENT]),
+    validate(getDoctorsQuerySchema),
+    patientController.getDoctors
+);
+
+router.get(
+    API.PATIENTS.GET_DOCTOR_AVAILABILITY,
+    authMiddleware([UserRole.PATIENT]),
+    validate(getDoctorAvailabilitySchema),
+    patientController.getDoctorAvailability
 );
 
 export default router;

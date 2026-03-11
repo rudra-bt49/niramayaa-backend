@@ -14,11 +14,20 @@ export const API = {
     },
     PROFILE: {
         UPDATE_PATIENT: "/patients/update-profile",
-        UPDATE_DOCTOR: "/doctors/update-profile",
-        GET_DOCTOR_PROFILE: "/doctors/profile",
+        UPDATE_DOCTOR: "/update-profile",
+        GET_DOCTOR_PROFILE: "/profile",
         GET_PATIENT_PROFILE: "/patients/profile",
     },
+    COMMON: {
+        GET_DOCTORS: '/doctors/list',
+    },
+    PATIENTS: {
+        GET_DOCTOR_AVAILABILITY: '/patients/availability/:doctorId',
+    },
     DOCTORS: "/doctors",
+    DOCTOR_EXTRA: {
+        GET_AVAILABILITY: '/availability',
+    },
     QRCODE: {
         GET: '/qrcode',
         REGENERATE: '/qrcode/regenerate'

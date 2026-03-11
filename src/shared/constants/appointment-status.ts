@@ -1,0 +1,6 @@
+export enum appointment_status {
+    SCHEDULED = 'SCHEDULED',
+    PAYMENT_FAILED = 'PAYMENT_FAILED',
+    COMPLETED = 'COMPLETED',
+    REFUND_REQUESTED = 'REFUND_REQUESTED'
+}
