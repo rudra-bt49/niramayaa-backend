@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler';
 import { patientService } from './patient.service';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { ApiResponse } from '../../shared/utils/ApiResponse';
-import { IUpdatePatientProfileRequest } from './patient.profile.types';
+import { IUpdatePatientProfileRequest } from './patient.types';
 import { IGetDoctorsQuery, getDoctorsQuerySchema, getDoctorAvailabilitySchema } from './patient.validator';
 
 export const patientController = {

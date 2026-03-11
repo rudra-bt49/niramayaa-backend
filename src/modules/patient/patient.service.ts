@@ -1,7 +1,7 @@
 import prisma from '../../prisma/prisma';
 import bcrypt from 'bcrypt';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
-import { IUpdatePatientProfileRequest, IUpdatePatientProfileResponse } from './patient.profile.types';
+import { IUpdatePatientProfileRequest, IUpdatePatientProfileResponse } from './patient.types';
 
 import { IGetDoctorsQuery } from './patient.validator';
 import { Prisma, Specialty, Qualification } from '@prisma/client';
@@ -10,26 +10,12 @@ import { doctor_plan } from '../../shared/constants/doctor-plan';
 import { UserRole } from '../../shared/constants/roles';
 import { appointment_status } from '../../shared/constants/appointment-status';
 import { slot_status } from '../../shared/constants/slot-status';
+import { ISlot,
+    IDayAvailability
+ } from './patient.types';
 
 interface HttpError extends Error {
     statusCode?: number;
-}
-
-interface ISlot {
-    start_time: Date | null;
-    end_time: Date | null;
-    status: slot_status;
-}
-
-interface IDayAvailability {
-    date: string;
-    is_active: boolean;
-    slots: ISlot[];
-    start_time?: Date | null;
-    end_time?: Date | null;
-    break_start_time?: Date | null;
-    break_end_time?: Date | null;
-    slot_duration?: number;
 }
 
 export const patientService = {

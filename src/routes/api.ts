@@ -4,6 +4,7 @@ import paymentRoutes from "../modules/payment/payment.routes";
 import patientRoutes from "../modules/patient/patient.routes";
 import doctorRoutes from "../modules/doctor/doctor.routes";
 import qrcodeRoutes from "../modules/qrcode/qrcode.routes";
+import availabilityRoutes from "../modules/availability/availability.routes";
 import { API } from "../shared/constants/api-routes";
 
 const router = Router();
@@ -13,5 +14,6 @@ router.use(paymentRoutes);
 router.use(patientRoutes);
 router.use(API.DOCTORS, doctorRoutes);
 router.use(API.DOCTORS, qrcodeRoutes);
+router.use(API.DOCTORS, availabilityRoutes);
 
 export default router;
