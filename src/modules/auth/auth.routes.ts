@@ -1,15 +1,16 @@
 import { Router } from "express";
 import { authController } from "./auth.controller";
 import { validate } from "../../middlewares/validate.middleware";
-import { patientSignupSchema, 
-    loginSchema, 
-    sendOtpSchema, 
-    verifyOtpSchema, 
-    doctorSignupSchema, 
-    forgotPasswordSchema, 
-    resetPasswordSchema, 
-    validateSessionSchema, 
-    refreshTokenSchema 
+import {
+    patientSignupSchema,
+    loginSchema,
+    sendOtpSchema,
+    verifyOtpSchema,
+    doctorSignupSchema,
+    forgotPasswordSchema,
+    resetPasswordSchema,
+    validateSessionSchema,
+    refreshTokenSchema
 } from "./auth.validator";
 import { authMiddleware } from "../../middlewares/auth.middleware";
 
@@ -66,6 +67,7 @@ router.post(
 
 router.post(
     API.AUTH.VALIDATE_SESSION,
+    authMiddleware(),
     validate(validateSessionSchema),
     authController.validateSession
 );

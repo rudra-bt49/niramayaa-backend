@@ -23,11 +23,13 @@ export const authController = {
         const { deviceId, deviceName } = getDeviceInfo(req);
         const result = await authService.patientSignup(req.body, deviceId, deviceName);
 
+        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
+
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -61,11 +63,13 @@ export const authController = {
         const { deviceId, deviceName } = getDeviceInfo(req);
         const result = await authService.login(req.body, deviceId, deviceName);
 
+        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
+
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -98,11 +102,13 @@ export const authController = {
         const { deviceId, deviceName } = getDeviceInfo(req);
         const result = await authService.verifyDoctorPaymentSession(session_id, deviceId, deviceName);
 
+        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
+
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -141,16 +147,11 @@ export const authController = {
     }),
 
     validateSession: asyncHandler(async (req: Request, res: Response) => {
-        const refreshToken = req.cookies?.refreshToken;
-        if (!refreshToken) {
-            res.status(401).json(ApiResponse.error("Session expired or missing. Please Login", 401));
-            return;
-        }
-        const result = await authService.validateSession(refreshToken);
+        // If authMiddleware passed, the session is valid
         res.status(200).json(
             ApiResponse.success(
                 null,
-                result.message,
+                "Session is valid",
                 200
             )
         );
@@ -184,11 +185,13 @@ export const authController = {
 
         await authService.logout(userId, refreshToken);
 
+        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
+
         // Clear the refresh token cookie on the client side
         res.clearCookie('refreshToken', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
             path: '/'
         });
 
