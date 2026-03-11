@@ -31,5 +31,16 @@ export const doctorController = {
         const updatedProfile = await doctorService.updateProfile(userId, data, file);
 
         res.status(200).json(ApiResponse.success(updatedProfile, 'Profile updated successfully'));
+    }),
+
+    getAvailability: asyncHandler(async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json(ApiResponse.error('Unauthorized', 401));
+            return;
+        }
+
+        const availability = await doctorService.getAvailability(userId);
+        res.status(200).json(ApiResponse.success(availability, 'Availability fetched successfully'));
     })
 };

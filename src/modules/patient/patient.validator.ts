@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IndianCity, Gender, BloodType } from '@prisma/client';
+import { IndianCity, Gender, BloodType, Specialty } from '@prisma/client';
 import { REGEX } from '../../shared/constants/regex.constants';
 
 export const updatePatientProfileSchema = z.object({
@@ -56,4 +56,63 @@ export const updatePatientProfileSchema = z.object({
     }),
 });
 
+export const getDoctorsQuerySchema = z.object({
+    query: z.object({
+        page: z.preprocess((val) => (val ? parseInt(String(val)) : 1), z.number().min(1).default(1)),
+        limit: z.preprocess((val) => (val ? parseInt(String(val)) : 4), z.number().min(1).max(50).default(4)),
+        search: z.string().optional(),
+
+        // Multi-select enabled filters
+        locations: z.union([
+            z.nativeEnum(IndianCity).array(),
+            z.string().transform((val) => {
+                try {
+                    const parsed = JSON.parse(val);
+                    return Array.isArray(parsed) ? parsed : [val];
+                } catch {
+                    return [val];
+                }
+            }).pipe(z.nativeEnum(IndianCity).array())
+        ]).optional(),
+
+        genders: z.union([
+            z.nativeEnum(Gender).array(),
+            z.string().transform((val) => {
+                try {
+                    const parsed = JSON.parse(val);
+                    return Array.isArray(parsed) ? parsed : [val];
+                } catch {
+                    return [val];
+                }
+            }).pipe(z.nativeEnum(Gender).array())
+        ]).optional(),
+
+        specialties: z.union([
+            z.nativeEnum(Specialty).array(),
+            z.string().transform((val) => {
+                try {
+                    const parsed = JSON.parse(val);
+                    return Array.isArray(parsed) ? parsed : [val];
+                } catch {
+                    return [val];
+                }
+            }).pipe(z.nativeEnum(Specialty).array())
+        ]).optional(),
+
+        min_experience: z.preprocess((val) => (val ? parseInt(String(val)) : undefined), z.number().min(0).max(128).optional()),
+        min_rating: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(0).max(5).optional()),
+        min_fee: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(0).max(1000000).optional()),
+        max_fee: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(0).max(1000000).optional()),
+
+        sort_by: z.enum(['name_asc', 'name_desc', 'fee_asc', 'fee_desc']).optional(),
+    }),
+});
+
+export const getDoctorAvailabilitySchema = z.object({
+    params: z.object({
+        doctorId: z.string().uuid("Invalid doctor ID format")
+    })
+});
+
 export type IUpdatePatientProfile = z.infer<typeof updatePatientProfileSchema>['body'];
+export type IGetDoctorsQuery = z.infer<typeof getDoctorsQuerySchema>['query'];
