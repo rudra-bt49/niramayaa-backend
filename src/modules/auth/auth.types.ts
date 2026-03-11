@@ -89,9 +89,7 @@ export interface IResetPasswordRequest {
 }
 
 export interface IValidateSessionRequest {
-  refreshToken: string;
 }
 
 export interface IRefreshTokenRequest {
-  refreshToken: string;
 }

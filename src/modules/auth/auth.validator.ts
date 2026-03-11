@@ -12,7 +12,7 @@ const calculateAge = (dob: string) => {
     }
     return age;
 };
- 
+
 
 export const patientSignupSchema = z.object({
     body: z.object({
@@ -32,9 +32,9 @@ export const patientSignupSchema = z.object({
         dob: z.string().refine((val) => {
             const birthDate = new Date(val);
             const today = new Date();
-        
+
             if (birthDate > today) return false;
-        
+
             const age = calculateAge(val);
             return age >= 0 && age <= 150;
         }, "Age must be between 0 and 150 and DOB cannot be in the future"),
@@ -80,9 +80,9 @@ export const doctorSignupSchema = z.object({
         dob: z.string().refine((val) => {
             const birthDate = new Date(val);
             const today = new Date();
-    
+
             if (birthDate > today) return false;
-    
+
             const age = calculateAge(val);
             return age >= 22 && age <= 150;
         }, "Doctor age must be between 22 and 150"),
@@ -110,13 +110,9 @@ export const resetPasswordSchema = z.object({
 });
 
 export const validateSessionSchema = z.object({
-    body: z.object({
-        refreshToken: z.string().min(1, "Refresh token is required"),
-    }),
+    body: z.object({}),
 });
 
 export const refreshTokenSchema = z.object({
-    body: z.object({
-        refreshToken: z.string().min(1, "Refresh token is required"),
-    }),
+    body: z.object({}),
 });

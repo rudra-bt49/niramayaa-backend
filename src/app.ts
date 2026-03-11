@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import * as useragent from "express-useragent";
 import apiRoutes from "./routes/api";
 import { errorHandler } from "./middlewares/error.middleware";
 import { APP_CONSTANTS } from "./shared/constants/app.constants";
@@ -10,6 +12,8 @@ const app = express();
 
 // Security
 app.use(helmet());
+app.use(cookieParser());
+app.use(useragent.express());
 
 // CORS
 app.use(

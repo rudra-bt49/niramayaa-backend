@@ -28,9 +28,9 @@ export const updateDoctorProfileSchema = z.object({
         consultation_fee: z.preprocess((val) => (val ? parseFloat(String(val)) : undefined), z.number().min(10).max(1000000).optional()),
 
         // Password reset block
-        old_password: z.string().optional(),
-        new_password: z.string().regex(REGEX.PASSWORD, "Password must be at least 8 characters, one uppercase, one lowercase, one number and one special character").min(8, "New password must be at least 8 characters").optional(),
-        confirm_new_password: z.string().optional(),
+        old_password: z.preprocess((val) => (val === "" ? undefined : val), z.string().optional()),
+        new_password: z.preprocess((val) => (val === "" ? undefined : val), z.string().regex(REGEX.PASSWORD, "Password must be at least 8 characters, one uppercase, one lowercase, one number and one special character").min(8, "New password must be at least 8 characters").optional()),
+        confirm_new_password: z.preprocess((val) => (val === "" ? undefined : val), z.string().optional()),
     }).refine((data) => {
         if (data.new_password || data.confirm_new_password) {
             return data.new_password === data.confirm_new_password;
