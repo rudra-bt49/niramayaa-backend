@@ -9,6 +9,29 @@ export const convertUtcToIstDate = (utcDate: Date | null): Date | null => {
     return new Date(utcDate.getTime() + istOffsetInMs);
 };
 
+/**
+ * Converts IST time string to a UTC Date object relative to a base date.
+ * @param timeStr Time string in HH:MM format.
+ * @param baseDate The date from which to take year, month, and day (in IST).
+ * @returns UTC Date object.
+ */
+export const convertISTToUTC = (timeStr: string, baseDate: Date): Date => {
+    const istOffsetInMs = (5 * 60 + 30) * 60 * 1000;
+    
+    // Convert baseDate to IST to correctly extract the IST year, month, and day
+    const istDate = new Date(baseDate.getTime() + istOffsetInMs);
+    const year = istDate.getUTCFullYear();
+    const month = istDate.getUTCMonth(); 
+    const day = istDate.getUTCDate();
+
+    // Determine the target time components
+    const [hours, minutes] = timeStr.split(':').map(Number);
+
+    // Create timestamp as if it were UTC, then subtract offset to get actual UTC
+    const istTimestamp = Date.UTC(year, month, day, hours, minutes, 0, 0);
+    return new Date(istTimestamp - istOffsetInMs);
+};
+
 export interface TimeSlot {
     start_time: Date;
     end_time: Date;
