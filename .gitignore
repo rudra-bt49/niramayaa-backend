@@ -3,3 +3,6 @@
 /dist/
 .env
 /generated/prisma
+
+postman_examples_appointment.json
+LOCAL_WEBHOOK_TESTING_GUIDE.md

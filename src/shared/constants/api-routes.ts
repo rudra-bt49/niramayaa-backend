@@ -29,6 +29,10 @@ export const API = {
         GET_AVAILABILITY: '/availability',
         EDIT_AVAILABILITY: '/availability/edit',
     },
+    APPOINTMENT: {
+        BASE: '/appointment',
+        BOOK: '/book'
+    },
     QRCODE: {
         GET: '/qrcode',
         REGENERATE: '/qrcode/regenerate'

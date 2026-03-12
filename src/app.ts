@@ -29,6 +29,7 @@ app.use(
     verify: (req: any, res, buf) => {
       const webhookPath = `${APP_CONSTANTS.API_BASE_PATH}${API.PAYMENT.WEBHOOK}`;
       if (req.originalUrl === webhookPath) {
+        console.log(`📦 Webhook hit: ${req.originalUrl}`);
         req.rawBody = buf;
       }
     },

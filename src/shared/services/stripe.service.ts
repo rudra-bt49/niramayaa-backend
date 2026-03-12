@@ -52,6 +52,54 @@ class StripeService {
     }
 
     /**
+     * Create a Checkout Session for appointment booking
+     */
+    async createAppointmentCheckoutSession(params: {
+        patientEmail: string;
+        doctorName: string;
+        amount: number;
+        successUrl: string;
+        cancelUrl: string;
+        metadata: Record<string, string>;
+        expiresAt?: number;
+    }) {
+        if (!process.env.STRIPE_SECRET_KEY) {
+            throw new Error('STRIPE_SECRET_KEY is missing in backend .env file');
+        }
+
+        try {
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'inr',
+                            product_data: {
+                                name: `Appointment with ${params.doctorName}`,
+                                description: `Booking for ${params.patientEmail}`,
+                            },
+                            unit_amount: Math.round(params.amount * 100),
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                customer_email: params.patientEmail,
+                success_url: params.successUrl,
+                cancel_url: params.cancelUrl,
+                metadata: params.metadata,
+                expires_at: params.expiresAt,
+            });
+
+            return session;
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown Stripe error';
+            console.error('Stripe Session Creation Error:', errorMessage);
+            throw error;
+        }
+    }
+
+    /**
      * Retrieve full session details including payment intent
      */
     async getSessionDetails(sessionId: string) {
