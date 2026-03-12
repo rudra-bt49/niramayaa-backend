@@ -228,7 +228,7 @@ export const patientService = {
         };
 
         // 3. Min Rating
-        if (min_rating !== undefined) {
+        if (min_rating && min_rating > 0) {
             // Group ratings by doctor to find those with avg >= min_rating
             const ratingGroups = await prisma.rating.groupBy({
                 by: ['doctor_id'],
