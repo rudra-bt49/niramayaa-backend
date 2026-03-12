@@ -1,4 +1,5 @@
 import prisma from '../../prisma/prisma';
+import { AppointmentStatus } from '@prisma/client';
 import { UpdateAvailabilityReqBody } from './availability.types';
 import { generateSlots } from '../../shared/utils/timezone';
 
@@ -28,7 +29,7 @@ export class AvailabilityService {
             // IST 00:00:00 is UTC previous day 18:30:00
             const istStartOfDay = new Date(Date.UTC(year, month, date, 0, 0, 0, 0));
             const utcRangeStart = new Date(istStartOfDay.getTime() - (5.5 * 60 * 60 * 1000));
-            
+
             // IST 23:59:59.999 
             const istEndOfDay = new Date(Date.UTC(year, month, date, 23, 59, 59, 999));
             const utcRangeEnd = new Date(istEndOfDay.getTime() - (5.5 * 60 * 60 * 1000));
@@ -50,6 +51,18 @@ export class AvailabilityService {
             }
 
             if (!is_active) {
+                // Check if any scheduled appointments exist before making inactive
+                const bookedAppointments = await prisma.appointment.findMany({
+                    where: {
+                        availability_id: existingRecord.id,
+                        status: AppointmentStatus.SCHEDULED
+                    }
+                });
+
+                if (bookedAppointments.length > 0) {
+                    throw new Error(`Cannot mark ${dateStr} as inactive because there are ${bookedAppointments.length} scheduled appointments.`);
+                }
+
                 // Just update is_active to false
                 await prisma.availability.update({
                     where: { id: existingRecord.id },
@@ -63,6 +76,72 @@ export class AvailabilityService {
                 const breakStartStr = break_start as string;
                 const breakEndStr = break_end as string;
                 const slotDurationMin = slot_duration as number;
+
+                // 1. Fetch appointments to validate constraints
+                const bookedAppointments = await prisma.appointment.findMany({
+                    where: {
+                        availability_id: existingRecord.id,
+                        NOT: { status: AppointmentStatus.PAYMENT_FAILED }
+                    }
+                });
+
+                // 2. Lock slot_duration if appointments are SCHEDULED
+                const hasScheduled = bookedAppointments.some(a => a.status === AppointmentStatus.SCHEDULED);
+                if (hasScheduled && slotDurationMin !== existingRecord.slot_duration) {
+                    throw new Error(`Cannot change slot duration for ${dateStr} as there are scheduled appointments.`);
+                }
+
+                // 3. Past Time Constraints (Today Only)
+                const now = new Date();
+                const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+                const todayStr = istNow.toISOString().split('T')[0];
+
+                const parseTime = (t: string) => {
+                    const [h, m] = t.split(':').map(Number);
+                    return h * 60 + m;
+                };
+
+                const getIstMins = (d: Date) => {
+                    const istDate = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+                    return istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
+                };
+
+                if (dateStr === todayStr) {
+                    const currentMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
+
+                    const oldStartMins = getIstMins(existingRecord.start_at);
+                    const oldEndMins = getIstMins(existingRecord.end_at);
+                    const oldBStartMins = existingRecord.break_start ? getIstMins(existingRecord.break_start) : null;
+                    const oldBEndMins = existingRecord.break_end ? getIstMins(existingRecord.break_end) : null;
+
+                    if (oldStartMins < currentMins && parseTime(startAtStr) !== oldStartMins) throw new Error("Shift start has already passed.");
+                    if (oldEndMins < currentMins && parseTime(endAtStr) !== oldEndMins) throw new Error("Shift end has already passed.");
+                    if (oldBStartMins && oldBStartMins < currentMins && parseTime(breakStartStr) !== oldBStartMins) throw new Error("Break start has already passed.");
+                    if (oldBEndMins && oldBEndMins < currentMins && parseTime(breakEndStr) !== oldBEndMins) throw new Error("Break end has already passed.");
+                }
+
+                // 4. Validate clashes with existing bookings
+                const newStartMins = parseTime(startAtStr);
+                const newEndMins = parseTime(endAtStr);
+                const newBStartMins = parseTime(breakStartStr);
+                const newBEndMins = parseTime(breakEndStr);
+
+                for (const appt of bookedAppointments) {
+                    const apptStartMins = getIstMins(appt.start_at);
+                    const apptEndMins = getIstMins(appt.end_at);
+
+                    // Must be within work hours
+                    if (apptStartMins < newStartMins || apptEndMins > newEndMins) {
+                        const timeStr = appt.start_at.toISOString().split('T')[1].substring(0, 5);
+                        throw new Error(`Timing clash: appointment exists at ${timeStr} IST for ${dateStr}.`);
+                    }
+
+                    // Must NOT be in the break
+                    if (!(apptEndMins <= newBStartMins || apptStartMins >= newBEndMins)) {
+                        const timeStr = appt.start_at.toISOString().split('T')[1].substring(0, 5);
+                        throw new Error(`Break clash: appointment exists at ${timeStr} IST for ${dateStr}.`);
+                    }
+                }
 
                 // Create helper to convert "HH:MM" on this date to correct UTC Date object
                 const createUtcDateTime = (timeStr: string) => {

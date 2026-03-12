@@ -67,10 +67,10 @@ export const updateAvailabilitySchema = z.object({
                     });
                 }
 
-                if (breakStartMins < startMins || breakEndMins > endMins) {
+                if (breakStartMins <= startMins || breakEndMins >= endMins) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
-                        message: "Break time must be within working hours (start_at to end_at)",
+                        message: "Break must be strictly within working hours (cannot start at shift start or end at shift end)",
                         path: ['break_start'],
                     });
                 }

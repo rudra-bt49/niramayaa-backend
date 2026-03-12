@@ -136,14 +136,28 @@ export const doctorService = {
         }
 
 
-        const nowUtc = new Date();
-        const thirtyDaysFromNowUtc = new Date(nowUtc.getTime() + 30 * 24 * 60 * 60 * 1000);
+        // Calculate start of today in IST, then convert to UTC for DB query
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const istNow = new Date(now.getTime() + istOffset);
+
+        // IST Start of Day
+        const istStartOfToday = new Date(Date.UTC(
+            istNow.getUTCFullYear(),
+            istNow.getUTCMonth(),
+            istNow.getUTCDate(),
+            0, 0, 0, 0
+        ));
+
+        // Convert back to UTC for Prisma
+        const utcStartOfToday = new Date(istStartOfToday.getTime() - istOffset);
+        const thirtyDaysFromNowUtc = new Date(utcStartOfToday.getTime() + 30 * 24 * 60 * 60 * 1000);
 
         const availabilityRecords = await prisma.availability.findMany({
             where: {
                 doctor_id: doctorId,
                 start_at: {
-                    gte: nowUtc,
+                    gte: utcStartOfToday,
                     lte: thirtyDaysFromNowUtc
                 }
             },
@@ -156,7 +170,7 @@ export const doctorService = {
             const istStartAt = convertUtcToIstDate(record.start_at)!;
             const istEndAt = convertUtcToIstDate(record.end_at)!;
             const dateStr = istStartAt.toISOString().split('T')[0];
-            
+
             let breakDurationMs = 0;
             let istBreakStartAt = null;
             let istBreakEndAt = null;
@@ -167,13 +181,6 @@ export const doctorService = {
                 istBreakEndAt = convertUtcToIstDate(record.break_end);
             }
 
-            const totalDurationMs = record.end_at.getTime() - record.start_at.getTime();
-            const activeDurationMs = totalDurationMs - breakDurationMs;
-            
-            // Generate total_slots based on net active duration / slot interval
-            const slotDurationMs = record.slot_duration * 60 * 1000;
-            const totalSlots = Math.floor(activeDurationMs / slotDurationMs);
-
             return {
                 date: dateStr,
                 start_at: istStartAt,
@@ -182,7 +189,7 @@ export const doctorService = {
                 break_end: istBreakEndAt,
                 slot_duration: record.slot_duration,
                 is_active: record.is_active,
-                total_slots: totalSlots
+                total_slots: record.queue_capacity
             };
         });
 
@@ -201,7 +208,7 @@ export const doctorService = {
 
         const availabilities = [];
         const slot_duration = 20;
-        
+
         // Queue capacity: 9 AM to 1 PM (4 hrs, 12 slots) + 2 PM to 5 PM (3 hrs, 9 slots) = 21 slots.
         const queue_capacity = 21;
 
@@ -211,11 +218,11 @@ export const doctorService = {
 
         while (daysAdded < 30) {
             const targetDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-            
+
             // Convert to IST (UTC + 5:30) to reliably check day of week
             const istTime = new Date(targetDate.getTime() + (5.5 * 60 * 60 * 1000));
             const dayOfWeek = istTime.getUTCDay(); // 0 is Sunday
-            
+
             const year = istTime.getUTCFullYear();
             const month = istTime.getUTCMonth();
             const date = istTime.getUTCDate();
@@ -241,7 +248,7 @@ export const doctorService = {
                 is_active: dayOfWeek !== 0, // False on Sundays
                 queue_capacity
             });
-            
+
             daysAdded++;
             dayOffset++;
         }

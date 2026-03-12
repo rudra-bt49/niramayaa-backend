@@ -24,31 +24,25 @@ export const generateSlots = (
     const slots: TimeSlot[] = [];
     const slotDurationMs = slotDurationMinutes * 60 * 1000;
 
-    let currentStart = startAt.getTime();
-    const end = endAt.getTime();
-
-    while (currentStart + slotDurationMs <= end) {
-        const currentEnd = currentStart + slotDurationMs;
-
-        // Check if the current slot overlaps with the break time
-        let isBreakOverlap = false;
-        if (breakStart && breakEnd) {
-            const bStart = breakStart.getTime();
-            const bEnd = breakEnd.getTime();
-            // A slot overlaps if it starts before break ends AND ends after break starts
-            if (currentStart < bEnd && currentEnd > bStart) {
-                isBreakOverlap = true;
-            }
-        }
-
-        if (!isBreakOverlap) {
+    const generateForSegment = (segStart: number, segEnd: number) => {
+        let currentStart = segStart;
+        while (currentStart + slotDurationMs <= segEnd) {
             slots.push({
                 start_time: new Date(currentStart),
-                end_time: new Date(currentEnd)
+                end_time: new Date(currentStart + slotDurationMs)
             });
+            currentStart += slotDurationMs;
         }
+    };
 
-        currentStart = currentEnd;
+    if (breakStart && breakEnd) {
+        // Segment 1: Before Break
+        generateForSegment(startAt.getTime(), breakStart.getTime());
+        // Segment 2: After Break
+        generateForSegment(breakEnd.getTime(), endAt.getTime());
+    } else {
+        // No break, calculate for entire shift
+        generateForSegment(startAt.getTime(), endAt.getTime());
     }
 
     return slots;
