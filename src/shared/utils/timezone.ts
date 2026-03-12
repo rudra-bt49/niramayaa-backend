@@ -32,6 +32,24 @@ export const convertISTToUTC = (timeStr: string, baseDate: Date): Date => {
     return new Date(istTimestamp - istOffsetInMs);
 };
 
+/**
+ * Converts a full IST ISO string (even if it lacks offset) to a UTC Date object.
+ * Assumes the input string represents IST time.
+ */
+export const convertIstToUtc = (isoStr: string): Date => {
+    const istOffsetInMs = (5 * 60 + 30) * 60 * 1000;
+    
+    // Normalize string: if it doesn't have a timezone, treat it as UTC temporarily to get base value
+    let normalizedIso = isoStr;
+    if (!isoStr.endsWith('Z') && !isoStr.includes('+') && !isoStr.includes('-')) {
+        normalizedIso += 'Z';
+    }
+    
+    const utcDate = new Date(normalizedIso);
+    // Subtract 5:30 to get the actual UTC time representing that IST value
+    return new Date(utcDate.getTime() - istOffsetInMs);
+};
+
 export interface TimeSlot {
     start_time: Date;
     end_time: Date;

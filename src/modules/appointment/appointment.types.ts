@@ -2,9 +2,8 @@ import { Gender, BloodType } from "@prisma/client";
 
 export interface BookAppointmentReqBody {
     doctor_id: string;
-    availability_id: string;
-    start_at: string; // HH:MM
-    end_at: string;   // HH:MM
+    start_at: string; // ISO String (e.g., 2026-03-12T10:30:00Z)
+    end_at: string;   // ISO String (e.g., 2026-03-12T10:50:00Z)
     name: string;
     email: string;
     phone: string;

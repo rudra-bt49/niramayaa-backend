@@ -3,7 +3,7 @@ import { BookAppointmentReqBody } from './appointment.types';
 import { stripeService } from '../../shared/services/stripe.service';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { AppointmentStatus } from '@prisma/client';
-import { convertISTToUTC } from '../../shared/utils/timezone';
+import { convertISTToUTC, convertIstToUtc } from '../../shared/utils/timezone';
 
 export const appointmentService = {
     initiateBookingSession: async (params: {
@@ -32,25 +32,30 @@ export const appointmentService = {
         }
 
         // 3. Find/Validate Availability
-        const availability = await prisma.availability.findUnique({
-            where: { id: body.availability_id }
+        // We find the availability record for this doctor that covers the requested time
+        const startAtUtc = convertIstToUtc(body.start_at);
+        const endAtUtc = convertIstToUtc(body.end_at);
+
+        const availability = await prisma.availability.findFirst({
+            where: {
+                doctor_id: body.doctor_id,
+                is_active: true,
+                start_at: { lte: startAtUtc },
+                end_at: { gte: endAtUtc }
+            }
         });
 
         if (!availability) {
-            throw new Error('No valid availability found for this slot');
+            throw new Error('No valid active availability found for this slot');
         }
 
-        // 4. Convert requested start_at and end_at (IST) to UTC Dates using availability's date
-        const startAtUtc = convertISTToUTC(body.start_at, availability.start_at);
-        const endAtUtc = convertISTToUTC(body.end_at, availability.start_at);
-
-        // 5. Validation: start_at must be in the future
+        // 4. Validation: start_at must be in the future
         const now = new Date();
         if (startAtUtc <= now) {
             throw new Error('Appointment must be booked for a future time');
         }
 
-        // 6. Validation: Duration must match slot_duration
+        // 5. Validation: Duration must match slot_duration
         const durationInMins = Math.round((endAtUtc.getTime() - startAtUtc.getTime()) / 60000);
         if (durationInMins !== availability.slot_duration) {
             throw new Error(`Slot duration (${durationInMins} mins) does not match doctor's expected slot duration of ${availability.slot_duration} mins`);
