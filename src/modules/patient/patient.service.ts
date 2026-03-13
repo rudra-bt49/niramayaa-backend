@@ -9,6 +9,7 @@ import { convertUtcToIstDate, generateSlots } from '../../shared/utils/timezone'
 import { doctor_plan } from '../../shared/constants/doctor-plan';
 import { UserRole } from '../../shared/constants/roles';
 import { appointment_status } from '../../shared/constants/appointment-status';
+import { patient_appointment_tabs } from '../../shared/constants/appointment-tabs';
 import { slot_status } from '../../shared/constants/slot-status';
 import {
     ISlot,
@@ -512,12 +513,12 @@ export const patientService = {
             }
         }
 
-        if (tab === 'scheduled') {
+        if (tab === patient_appointment_tabs.SCHEDULED) {
             where.status = appointment_status.SCHEDULED;
             where.start_at = { gte: now, ...((where.start_at as any) || {}) };
-        } else if (tab === 'pending_payment') {
+        } else if (tab === patient_appointment_tabs.PENDING_PAYMENT) {
             where.status = appointment_status.PAYMENT_PENDING;
-        } else if (tab === 'history') {
+        } else if (tab === patient_appointment_tabs.HISTORY) {
             const historyStatuses = status && status.length > 0
                 ? status
                 : [appointment_status.COMPLETED, appointment_status.PAYMENT_FAILED, appointment_status.REFUND_REQUESTED];
@@ -532,7 +533,7 @@ export const patientService = {
 
         // 2. Sorting logic
         let orderBy: Prisma.appointmentOrderByWithRelationInput = { start_at: 'desc' };
-        if (tab === 'scheduled') {
+        if (tab === patient_appointment_tabs.SCHEDULED) {
             orderBy = { start_at: sort_by === 'nearest' ? 'asc' : 'desc' };
         } else {
             orderBy = { start_at: sort_by === 'nearest' ? 'desc' : 'asc' };

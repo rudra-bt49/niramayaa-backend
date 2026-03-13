@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { IndianCity, Specialty, Qualification, AppointmentStatus } from '@prisma/client';
 import { REGEX } from '../../shared/constants/regex.constants';
+import { doctor_appointment_tabs } from '../../shared/constants/appointment-tabs';
 
 export const updateDoctorProfileSchema = z.object({
     body: z.object({
@@ -56,7 +57,7 @@ export const getAppointmentsQuerySchema = z.object({
     query: z.object({
         page: z.preprocess((val) => (val ? parseInt(String(val)) : 1), z.number().min(1).default(1)),
         limit: z.preprocess((val) => (val ? parseInt(String(val)) : 4), z.number().min(1).default(4)),
-        tab: z.enum(['ongoing', 'scheduled', 'history']),
+        tab: z.nativeEnum(doctor_appointment_tabs),
         from: z.string().optional(),
         to: z.string().optional(),
         status: z.preprocess((val) => {

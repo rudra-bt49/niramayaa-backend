@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { IndianCity, Gender, BloodType, Specialty } from '@prisma/client';
 import { REGEX } from '../../shared/constants/regex.constants';
 import { appointment_status } from '../../shared/constants/appointment-status';
+import { patient_appointment_tabs } from '../../shared/constants/appointment-tabs';
 
 export const updatePatientProfileSchema = z.object({
     body: z.object({
@@ -113,7 +114,7 @@ export const getAppointmentsQuerySchema = z.object({
     query: z.object({
         page: z.preprocess((val) => (val ? parseInt(String(val)) : 1), z.number().min(1).default(1)),
         limit: z.preprocess((val) => (val ? parseInt(String(val)) : 4), z.number().min(1).max(50).default(4)),
-        tab: z.enum(['scheduled', 'pending_payment', 'history']),
+        tab: z.nativeEnum(patient_appointment_tabs),
         from: z.string().optional(),
         to: z.string().optional(),
         status: z.union([

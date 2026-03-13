@@ -5,6 +5,7 @@ import { IUpdateDoctorProfileRequest, IUpdateDoctorProfileResponse } from './doc
 import { convertUtcToIstDate } from '../../shared/utils/timezone';
 import { IGetDoctorAppointmentsQuery } from './doctor.validator';
 import { appointment_status } from '../../shared/constants/appointment-status';
+import { doctor_appointment_tabs } from '../../shared/constants/appointment-tabs';
 import { Prisma } from '@prisma/client';
 
 export const doctorService = {
@@ -306,14 +307,14 @@ export const doctorService = {
             }
         }
 
-        if (tab === 'ongoing') {
+        if (tab === doctor_appointment_tabs.ONGOING) {
             where.status = appointment_status.SCHEDULED;
             where.start_at = { lte: now, ...((where.start_at as any)?.gte ? { gte: (where.start_at as any).gte } : {}) };
             where.end_at = { gte: now };
-        } else if (tab === 'scheduled') {
+        } else if (tab === doctor_appointment_tabs.SCHEDULED) {
             where.status = appointment_status.SCHEDULED;
             where.start_at = { gt: now, ...((where.start_at as any) || {}) };
-        } else if (tab === 'history') {
+        } else if (tab === doctor_appointment_tabs.HISTORY) {
             const historyStatuses = status && status.length > 0
                 ? status
                 : [appointment_status.COMPLETED, appointment_status.PAYMENT_FAILED, appointment_status.REFUND_REQUESTED];
