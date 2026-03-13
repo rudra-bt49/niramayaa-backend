@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { IndianCity, Specialty, Qualification } from '@prisma/client';
+import { IndianCity, Specialty, Qualification, AppointmentStatus } from '@prisma/client';
 import { REGEX } from '../../shared/constants/regex.constants';
+import { doctor_appointment_tabs } from '../../shared/constants/appointment-tabs';
 
 export const updateDoctorProfileSchema = z.object({
     body: z.object({
@@ -51,3 +52,42 @@ export const updateDoctorProfileSchema = z.object({
 });
 
 export type IUpdateDoctorProfile = z.infer<typeof updateDoctorProfileSchema>['body'];
+
+export const getAppointmentsQuerySchema = z.object({
+    query: z.object({
+        page: z.preprocess((val) => (val ? parseInt(String(val)) : 1), z.number().min(1).default(1)),
+        limit: z.preprocess((val) => (val ? parseInt(String(val)) : 4), z.number().min(1).default(4)),
+        tab: z.nativeEnum(doctor_appointment_tabs),
+        from: z.string().optional(),
+        to: z.string().optional(),
+        status: z.preprocess((val) => {
+            if (typeof val === 'string') return [val];
+            return val;
+        }, z.array(z.nativeEnum(AppointmentStatus)).optional()),
+        sort_by: z.enum(['nearest', 'farthest']).default('nearest')
+    })
+}).refine((data) => {
+    const { from, to } = data.query;
+    if (from && to) {
+        return new Date(from) <= new Date(to);
+    }
+    return true;
+}, {
+    message: "from date must be before or equal to to date",
+    path: ["query", "from"]
+}).refine((data) => {
+    const { from, tab } = data.query;
+    if (tab === 'history' && from) {
+        const fromDate = new Date(from);
+        const yesterday = new Date();
+        yesterday.setHours(0, 0, 0, 0);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return fromDate <= yesterday;
+    }
+    return true;
+}, {
+    message: "History 'from' date cannot be in the future (max value is yesterday)",
+    path: ["query", "from"]
+});
+
+export type IGetDoctorAppointmentsQuery = z.infer<typeof getAppointmentsQuerySchema>['query'];

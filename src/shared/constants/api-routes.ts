@@ -23,11 +23,13 @@ export const API = {
     },
     PATIENTS: {
         GET_DOCTOR_AVAILABILITY: '/patients/availability/:doctorId',
+        GET_APPOINTMENTS: '/patients/appointments',
     },
     DOCTORS: "/doctors",
     DOCTOR_EXTRA: {
         GET_AVAILABILITY: '/availability',
         EDIT_AVAILABILITY: '/availability/edit',
+        GET_APPOINTMENTS: '/appointments',
     },
     APPOINTMENT: {
         BASE: '/appointment',

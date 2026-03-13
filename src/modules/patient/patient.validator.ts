@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { IndianCity, Gender, BloodType, Specialty } from '@prisma/client';
 import { REGEX } from '../../shared/constants/regex.constants';
+import { appointment_status } from '../../shared/constants/appointment-status';
+import { patient_appointment_tabs } from '../../shared/constants/appointment-tabs';
 
 export const updatePatientProfileSchema = z.object({
     body: z.object({
@@ -108,6 +110,50 @@ export const getDoctorsQuerySchema = z.object({
     }),
 });
 
+export const getAppointmentsQuerySchema = z.object({
+    query: z.object({
+        page: z.preprocess((val) => (val ? parseInt(String(val)) : 1), z.number().min(1).default(1)),
+        limit: z.preprocess((val) => (val ? parseInt(String(val)) : 4), z.number().min(1).max(50).default(4)),
+        tab: z.nativeEnum(patient_appointment_tabs),
+        from: z.string().optional(),
+        to: z.string().optional(),
+        status: z.union([
+            z.nativeEnum(appointment_status).array(),
+            z.string().transform((val) => {
+                try {
+                    const parsed = JSON.parse(val);
+                    return Array.isArray(parsed) ? parsed : [val];
+                } catch {
+                    return [val];
+                }
+            }).pipe(z.nativeEnum(appointment_status).array())
+        ]).optional(),
+        sort_by: z.enum(['nearest', 'farthest']).default('nearest'),
+    }),
+}).refine((data) => {
+    const { from, to, tab } = data.query;
+    if (from && to) {
+        return new Date(from) <= new Date(to);
+    }
+    return true;
+}, {
+    message: "from date must be before or equal to to date",
+    path: ["query", "from"]
+}).refine((data) => {
+    const { from, tab } = data.query;
+    if (tab === 'history' && from) {
+        const fromDate = new Date(from);
+        const yesterday = new Date();
+        yesterday.setHours(0, 0, 0, 0);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return fromDate <= yesterday;
+    }
+    return true;
+}, {
+    message: "History 'from' date cannot be in the future (max value is yesterday)",
+    path: ["query", "from"]
+});
+
 export const getDoctorAvailabilitySchema = z.object({
     params: z.object({
         doctorId: z.string().uuid("Invalid doctor ID format")
@@ -116,3 +162,4 @@ export const getDoctorAvailabilitySchema = z.object({
 
 export type IUpdatePatientProfile = z.infer<typeof updatePatientProfileSchema>['body'];
 export type IGetDoctorsQuery = z.infer<typeof getDoctorsQuerySchema>['query'];
+export type IGetAppointmentsQuery = z.infer<typeof getAppointmentsQuerySchema>['query'];
