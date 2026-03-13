@@ -94,6 +94,28 @@ class EmailService {
       text,
     });
   }
+
+  /**
+   * Send Appointment Confirmation to Patient
+   */
+  public async sendAppointmentConfirmationToPatient(
+    email: string,
+    params: Parameters<typeof EmailTemplates.appointmentConfirmationPatient>[0]
+  ): Promise<boolean> {
+    const { subject, html, text } = EmailTemplates.appointmentConfirmationPatient(params);
+    return await this.sendEmail({ to: email, subject, html, text });
+  }
+
+  /**
+   * Send Appointment Notification to Doctor
+   */
+  public async sendAppointmentNotificationToDoctor(
+    email: string,
+    params: Parameters<typeof EmailTemplates.appointmentNotificationDoctor>[0]
+  ): Promise<boolean> {
+    const { subject, html, text } = EmailTemplates.appointmentNotificationDoctor(params);
+    return await this.sendEmail({ to: email, subject, html, text });
+  }
 }
 
 export default new EmailService();

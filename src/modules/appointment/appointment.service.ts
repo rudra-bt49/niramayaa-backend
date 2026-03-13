@@ -4,13 +4,14 @@ import { stripeService } from '../../shared/services/stripe.service';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { AppointmentStatus } from '@prisma/client';
 import { convertISTToUTC, convertIstToUtc } from '../../shared/utils/timezone';
+import { paymentService } from '../payment/payment.service';
 
 export const appointmentService = {
     initiateBookingSession: async (params: {
         userId: string;
         body: BookAppointmentReqBody;
         files: Express.Multer.File[];
-    }): Promise<string | null> => {
+    }): Promise<{ checkoutUrl: string; warning?: string }> => {
         const { userId, body, files } = params;
 
         // 1. Validate the user/patient
@@ -32,7 +33,6 @@ export const appointmentService = {
         }
 
         // 3. Find/Validate Availability
-        // We find the availability record for this doctor that covers the requested time
         const startAtUtc = convertIstToUtc(body.start_at);
         const endAtUtc = convertIstToUtc(body.end_at);
 
@@ -61,8 +61,7 @@ export const appointmentService = {
             throw new Error(`Slot duration (${durationInMins} mins) does not match doctor's expected slot duration of ${availability.slot_duration} mins`);
         }
 
-        // 7. Ensure the slot is not already booked
-        // We check if any SCHEDULED appointment for this doctor has the EXACT same start_at
+        // 7. Ensure the slot is not already booked (Doctor check)
         const existingAppointment = await prisma.appointment.findFirst({
             where: {
                 doctor_id: body.doctor_id,
@@ -73,6 +72,25 @@ export const appointmentService = {
 
         if (existingAppointment) {
             throw new Error('This slot is already booked');
+        }
+
+        // NEW: Check for patient overlap (Warning only)
+        const patientOverlap = await prisma.appointment.findFirst({
+            where: {
+                patient_id: patient.id,
+                status: AppointmentStatus.SCHEDULED,
+                OR: [
+                    {
+                        start_at: { lt: endAtUtc },
+                        end_at: { gt: startAtUtc }
+                    }
+                ]
+            }
+        });
+
+        let warning: string | undefined;
+        if (patientOverlap) {
+            warning = "Warning: You already have an appointment booked for this time slot. You can still proceed with this booking if you wish.";
         }
 
         // 8. Upload medical reports to Cloudinary
@@ -89,15 +107,14 @@ export const appointmentService = {
         }
 
         // 9. Create Stripe Checkout Session
-        // Stripe minimum expiry is 30 minutes. We'll set it to 30 minutes from now.
         const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
 
         const session = await stripeService.createAppointmentCheckoutSession({
             patientEmail: patient.email,
             doctorName: `Dr. ${doctor.first_name} ${doctor.last_name}`,
             amount: doctor.doctor_profile.consultation_fee,
-            successUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/appointment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/appointment/cancel`,
+            successUrl: `${process.env.CLIENT_URL}/patient/appointment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${process.env.CLIENT_URL}/patient/appointment/cancel?session_id={CHECKOUT_SESSION_ID}`,
             expiresAt,
             metadata: {
                 registration_type: 'APPOINTMENT_BOOKING',
@@ -118,6 +135,60 @@ export const appointmentService = {
             }
         });
 
-        return session.url;
+        return { checkoutUrl: session.url as string, warning };
+    },
+
+    getAppointmentBySessionId: async (sessionId: string) => {
+        // Fetch appointment inclusion payment and doctor details
+        const payment = await prisma.appointment_payment.findFirst({
+            where: { stripe_session_id: sessionId },
+            include: {
+                appointment: {
+                    include: {
+                        doctor: {
+                            include: {
+                                user: {
+                                    select: {
+                                        first_name: true,
+                                        last_name: true,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!payment) {
+            throw new Error('Appointment not found for this session');
+        }
+
+        const doctor = payment.appointment.doctor.user;
+
+        return {
+            appointment: {
+                ...payment.appointment,
+                doctor_name: `Dr. ${doctor.first_name} ${doctor.last_name}`
+            },
+            payment: {
+                amount: payment.amount,
+                currency: payment.currency,
+                payment_status: payment.payment_status,
+                receipt_url: payment.receipt_url,
+                payment_method: payment.payment_method
+            }
+        };
+    },
+
+    handleCancelledBooking: async (sessionId: string) => {
+        const session = await stripeService.getSessionDetails(sessionId);
+        if (!session) {
+            throw new Error('Invalid Stripe session');
+        }
+
+        // Process as failure
+        await paymentService.handleAppointmentSession(session as any, 'FAILURE');
+        return { success: true };
     }
 };
