@@ -3,16 +3,17 @@ import bcrypt from 'bcrypt';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { IUpdatePatientProfileRequest, IUpdatePatientProfileResponse } from './patient.types';
 
-import { IGetDoctorsQuery } from './patient.validator';
+import { IGetDoctorsQuery, IGetAppointmentsQuery } from './patient.validator';
 import { Prisma, Specialty, Qualification } from '@prisma/client';
 import { convertUtcToIstDate, generateSlots } from '../../shared/utils/timezone';
 import { doctor_plan } from '../../shared/constants/doctor-plan';
 import { UserRole } from '../../shared/constants/roles';
 import { appointment_status } from '../../shared/constants/appointment-status';
 import { slot_status } from '../../shared/constants/slot-status';
-import { ISlot,
+import {
+    ISlot,
     IDayAvailability
- } from './patient.types';
+} from './patient.types';
 
 interface HttpError extends Error {
     statusCode?: number;
@@ -345,8 +346,23 @@ export const patientService = {
             }
         }
 
+        // Calculate start of today in IST, then convert to UTC for DB query
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const istNow = new Date(now.getTime() + istOffset);
+
+        // IST Start of Day
+        const istStartOfToday = new Date(Date.UTC(
+            istNow.getUTCFullYear(),
+            istNow.getUTCMonth(),
+            istNow.getUTCDate(),
+            0, 0, 0, 0
+        ));
+
         // Find availability for the next 30 days
         const nowUtc = new Date();
+        const utcStartOfToday = new Date(istStartOfToday.getTime() - istOffset);
+
         const thirtyDaysFromNowUtc = new Date(nowUtc.getTime() + 30 * 24 * 60 * 60 * 1000);
 
         const [availabilityRecords, appointments] = await prisma.$transaction([
@@ -354,7 +370,7 @@ export const patientService = {
                 where: {
                     doctor_id: doctorId,
                     start_at: {
-                        gte: nowUtc,
+                        gte: utcStartOfToday,
                         lte: thirtyDaysFromNowUtc
                     }
                 },
@@ -451,6 +467,150 @@ export const patientService = {
         return {
             doctor_id: doctorId,
             availabilities
+        };
+    },
+
+    getAppointments: async (userId: string, query: IGetAppointmentsQuery) => {
+        const {
+            page = 1,
+            limit = 4,
+            tab,
+            from,
+            to,
+            status,
+            sort_by = 'nearest'
+        } = query;
+
+        const skip = (page - 1) * limit;
+        const now = new Date();
+
+        // 0. Just-in-time: Update past scheduled appointments to COMPLETED (only if end_at has passed)
+        await prisma.appointment.updateMany({
+            where: {
+                patient_id: userId,
+                status: appointment_status.SCHEDULED,
+                end_at: { lt: now }
+            },
+            data: {
+                status: appointment_status.COMPLETED
+            }
+        });
+
+        // 1. Build where clause based on tab
+        const where: Prisma.appointmentWhereInput = {
+            patient_id: userId
+        };
+
+        // Date range filtering (Applied to all tabs if provided)
+        if (from || to) {
+            where.start_at = {};
+            if (from) where.start_at.gte = new Date(from);
+            if (to) {
+                const toDate = new Date(to);
+                toDate.setHours(23, 59, 59, 999);
+                where.start_at.lte = toDate;
+            }
+        }
+
+        if (tab === 'scheduled') {
+            where.status = appointment_status.SCHEDULED;
+            where.start_at = { gte: now, ...((where.start_at as any) || {}) };
+        } else if (tab === 'pending_payment') {
+            where.status = appointment_status.PAYMENT_PENDING;
+        } else if (tab === 'history') {
+            const historyStatuses = status && status.length > 0
+                ? status
+                : [appointment_status.COMPLETED, appointment_status.PAYMENT_FAILED, appointment_status.REFUND_REQUESTED];
+
+            where.status = { in: historyStatuses as any };
+
+            // Default history: past only if no date range provided
+            if (!from && !to) {
+                where.start_at = { lt: now };
+            }
+        }
+
+        // 2. Sorting logic
+        let orderBy: Prisma.appointmentOrderByWithRelationInput = { start_at: 'desc' };
+        if (tab === 'scheduled') {
+            orderBy = { start_at: sort_by === 'nearest' ? 'asc' : 'desc' };
+        } else {
+            orderBy = { start_at: sort_by === 'nearest' ? 'desc' : 'asc' };
+        }
+
+        // 3. Execution
+        const [totalAppointments, appointments] = await prisma.$transaction([
+            prisma.appointment.count({ where }),
+            prisma.appointment.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy,
+                include: {
+                    doctor: {
+                        include: {
+                            user: {
+                                select: {
+                                    first_name: true,
+                                    last_name: true,
+                                    profile_image: true
+                                }
+                            }
+                        }
+                    },
+                    medical_reports: {
+                        select: {
+                            id: true,
+                            report_url: true,
+                            created_at: true
+                        }
+                    },
+                    rating: {
+                        select: {
+                            id: true,
+                            rating: true,
+                            review: true
+                        }
+                    },
+                    prescription: {
+                        include: {
+                            items: true
+                        }
+                    }
+                }
+            })
+        ]);
+
+        // 4. Formatting
+        const formattedAppointments = appointments.map(app => ({
+            id: app.id,
+            doctor_id: app.doctor_id,
+            doctor_name: `Dr. ${app.doctor.user.first_name} ${app.doctor.user.last_name}`,
+            doctor_specialties: app.doctor.specialties,
+            doctor_avatar: app.doctor.user.profile_image,
+            start_time: convertUtcToIstDate(app.start_at),
+            end_time: convertUtcToIstDate(app.end_at),
+            status: app.status,
+            description: app.description,
+            medical_reports: app.medical_reports,
+            queue_token: app.queue_token,
+            // Additional useful fields
+            fees: app.doctor.consultation_fee,
+            has_review: !!app.rating,
+            rating_details: app.rating,
+            prescription: app.prescription
+        }));
+
+        const totalPages = Math.ceil(totalAppointments / limit);
+
+        return {
+            appointments: formattedAppointments,
+            pagination: {
+                total_items: totalAppointments,
+                total_pages: totalPages,
+                current_page: page,
+                limit
+            }
         };
     }
 };

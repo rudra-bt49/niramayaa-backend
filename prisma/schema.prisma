@@ -89,6 +89,7 @@ enum BloodType {
 enum AppointmentStatus {
 
   SCHEDULED
+  PAYMENT_PENDING
   PAYMENT_FAILED
   COMPLETED
   REFUND_REQUESTED

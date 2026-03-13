@@ -3,6 +3,9 @@ import bcrypt from 'bcrypt';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { IUpdateDoctorProfileRequest, IUpdateDoctorProfileResponse } from './doctor.profile.types';
 import { convertUtcToIstDate } from '../../shared/utils/timezone';
+import { IGetDoctorAppointmentsQuery } from './doctor.validator';
+import { appointment_status } from '../../shared/constants/appointment-status';
+import { Prisma } from '@prisma/client';
 
 export const doctorService = {
     getProfile: async (userId: string): Promise<IUpdateDoctorProfileResponse | null> => {
@@ -259,5 +262,166 @@ export const doctorService = {
                 skipDuplicates: true
             });
         }
+    },
+
+    getAppointments: async (doctorId: string, query: IGetDoctorAppointmentsQuery) => {
+        const {
+            page = 1,
+            limit = 4,
+            tab,
+            from,
+            to,
+            status,
+            sort_by = 'nearest'
+        } = query;
+
+        const skip = (page - 1) * limit;
+        const now = new Date();
+
+        // 0. Just-in-time: Update past scheduled appointments to COMPLETED (only if end_at has passed)
+        await prisma.appointment.updateMany({
+            where: {
+                doctor_id: doctorId,
+                status: appointment_status.SCHEDULED,
+                end_at: { lt: now }
+            },
+            data: {
+                status: appointment_status.COMPLETED
+            }
+        });
+
+        // 1. Build where clause based on tab
+        const where: Prisma.appointmentWhereInput = {
+            doctor_id: doctorId
+        };
+
+        // Date range filtering (Applied to all tabs if provided)
+        if (from || to) {
+            where.start_at = {};
+            if (from) where.start_at.gte = new Date(from);
+            if (to) {
+                const toDate = new Date(to);
+                toDate.setHours(23, 59, 59, 999);
+                where.start_at.lte = toDate;
+            }
+        }
+
+        if (tab === 'ongoing') {
+            where.status = appointment_status.SCHEDULED;
+            where.start_at = { lte: now, ...((where.start_at as any)?.gte ? { gte: (where.start_at as any).gte } : {}) };
+            where.end_at = { gte: now };
+        } else if (tab === 'scheduled') {
+            where.status = appointment_status.SCHEDULED;
+            where.start_at = { gt: now, ...((where.start_at as any) || {}) };
+        } else if (tab === 'history') {
+            const historyStatuses = status && status.length > 0
+                ? status
+                : [appointment_status.COMPLETED, appointment_status.PAYMENT_FAILED, appointment_status.REFUND_REQUESTED];
+
+            where.status = { in: historyStatuses as any };
+        }
+
+        // 2. Sorting logic
+        let orderBy: Prisma.appointmentOrderByWithRelationInput = { start_at: 'desc' };
+        if (tab === 'scheduled' || tab === 'ongoing') {
+            orderBy = { start_at: sort_by === 'nearest' ? 'asc' : 'desc' };
+        } else {
+            orderBy = { start_at: sort_by === 'nearest' ? 'desc' : 'asc' };
+        }
+
+        // 3. Execution
+        const [totalAppointments, appointments] = await prisma.$transaction([
+            prisma.appointment.count({ where }),
+            prisma.appointment.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy,
+                include: {
+                    patient: {
+                        include: {
+                            user: {
+                                select: {
+                                    first_name: true,
+                                    last_name: true,
+                                    profile_image: true,
+                                    email: true,
+                                    phone_number: true,
+                                    dob: true
+                                }
+                            }
+                        }
+                    },
+                    medical_reports: {
+                        select: {
+                            id: true,
+                            report_url: true,
+                            created_at: true
+                        }
+                    },
+                    rating: {
+                        select: {
+                            id: true,
+                            rating: true,
+                            review: true
+                        }
+                    },
+                    prescription: {
+                        include: {
+                            items: true
+                        }
+                    }
+                }
+            })
+        ]);
+
+        // 4. Formatting
+        const formattedAppointments = appointments.map(app => {
+            // Calculate age
+            const dob = new Date(app.patient.user.dob);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const m = today.getMonth() - dob.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                age--;
+            }
+
+            return {
+                id: app.id,
+                patient_id: app.patient_id,
+                patient_name: `${app.patient.user.first_name} ${app.patient.user.last_name}`,
+                patient_avatar: app.patient.user.profile_image,
+                patient_email: app.patient.user.email,
+                patient_phone: app.patient.user.phone_number,
+                patient_age: age,
+                patient_dob: dob,
+                start_time: convertUtcToIstDate(app.start_at),
+                end_time: convertUtcToIstDate(app.end_at),
+                status: app.status,
+                description: app.description,
+                medical_reports: app.medical_reports,
+                queue_token: app.queue_token,
+                // Full details for modal
+                gender: app.gender,
+                height: app.height,
+                weight: app.weight,
+                blood_group: app.blood_group,
+                allergies: app.patient.allergies,
+                rating_details: app.rating,
+                prescription: app.prescription
+            };
+        });
+
+        const totalPages = Math.ceil(totalAppointments / limit);
+
+        return {
+            appointments: formattedAppointments,
+            pagination: {
+                total_items: totalAppointments,
+                total_pages: totalPages,
+                current_page: page,
+                limit
+            }
+        };
     }
 };

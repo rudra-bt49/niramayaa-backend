@@ -4,7 +4,7 @@ import { authMiddleware } from '../../middlewares/auth.middleware';
 import { upload } from '../../middlewares/upload.middleware';
 import { UserRole } from '../../shared/constants/roles';
 import { validate } from '../../middlewares/validate.middleware';
-import { updateDoctorProfileSchema } from './doctor.validator';
+import { updateDoctorProfileSchema, getAppointmentsQuerySchema } from './doctor.validator';
 import { API } from '../../shared/constants/api-routes';
 
 const router = Router();
@@ -27,6 +27,13 @@ router.get(
     API.DOCTOR_EXTRA.GET_AVAILABILITY,
     authMiddleware([UserRole.DOCTOR]),
     doctorController.getAvailability
+);
+
+router.get(
+    API.DOCTOR_EXTRA.GET_APPOINTMENTS,
+    authMiddleware([UserRole.DOCTOR]),
+    validate(getAppointmentsQuerySchema),
+    doctorController.getAppointments
 );
 
 export default router;

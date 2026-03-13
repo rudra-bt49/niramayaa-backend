@@ -4,7 +4,7 @@ import { patientService } from './patient.service';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { ApiResponse } from '../../shared/utils/ApiResponse';
 import { IUpdatePatientProfileRequest } from './patient.types';
-import { IGetDoctorsQuery, getDoctorsQuerySchema, getDoctorAvailabilitySchema } from './patient.validator';
+import { IGetDoctorsQuery, getDoctorsQuerySchema, getDoctorAvailabilitySchema, getAppointmentsQuerySchema } from './patient.validator';
 
 export const patientController = {
     getProfile: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -55,6 +55,24 @@ export const patientController = {
         res.status(200).json(ApiResponse.success(
             availability,
             'Doctor availability fetched successfully (IST timezone)',
+            200
+        ));
+    }),
+
+    getAppointments: asyncHandler(async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json(ApiResponse.error('Unauthorized', 401));
+            return;
+        }
+
+        const { query } = getAppointmentsQuerySchema.parse({ query: req.query });
+
+        const result = await patientService.getAppointments(userId, query);
+
+        res.status(200).json(ApiResponse.success(
+            result,
+            'Appointments fetched successfully',
             200
         ));
     })
