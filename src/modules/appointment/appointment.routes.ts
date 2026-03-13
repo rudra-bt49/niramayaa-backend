@@ -33,4 +33,12 @@ router.post(
     appointmentController.bookAppointment
 );
 
+router.get(
+    API.APPOINTMENT.GET_APPOINTMENT_STATUS,
+    authMiddleware([UserRole.PATIENT]),
+    appointmentController.getAppointmentStatus
+);
+
+router.post(API.APPOINTMENT.CANCEL_APPOINTMENT, authMiddleware([UserRole.PATIENT]), appointmentController.handleCancel);
+
 export default router;
