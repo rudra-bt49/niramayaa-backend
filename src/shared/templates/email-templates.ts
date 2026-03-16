@@ -336,6 +336,32 @@ export const EmailTemplates = {
     `;
         return { subject, html, text };
     },
+
+    /**
+     * New Prescription Template
+     */
+    newPrescription: (patientName: string, doctorName: string, items: any[]) => {
+        const subject = 'Your Prescription Has Been Issued';
+        const text = `Hi ${patientName}, Dr. ${doctorName} has issued a prescription for your consultation.`;
+        const heading = 'Prescription Issued';
+        const introText = `<strong>Dr. ${doctorName}</strong> has created your prescription for the consultation. You can find the details below:`;
+
+        const html = renderPrescriptionHtml(patientName, heading, introText, items);
+        return { subject, html, text };
+    },
+
+    /**
+     * Updated Prescription Template
+     */
+    updatedPrescription: (patientName: string, doctorName: string, items: any[]) => {
+        const subject = 'Your Prescription Has Been Updated';
+        const text = `Hi ${patientName}, Dr. ${doctorName} has updated your prescription.`;
+        const heading = 'Prescription Updated';
+        const introText = `<strong>Dr. ${doctorName}</strong> has updated your prescription. Please review the latest version below:`;
+
+        const html = renderPrescriptionHtml(patientName, heading, introText, items);
+        return { subject, html, text };
+    }
 };
 
 /**
