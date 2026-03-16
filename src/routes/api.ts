@@ -7,6 +7,7 @@ import qrcodeRoutes from "../modules/qrcode/qrcode.routes";
 import availabilityRoutes from "../modules/availability/availability.routes";
 import appointmentRoutes from "../modules/appointment/appointment.routes";
 import prescriptionRoutes from "../modules/prescription/prescription.routes";
+import ratingRoutes from "../modules/rating/rating.routes";
 import { API } from "../shared/constants/api-routes";
 
 const router = Router();
@@ -20,5 +21,6 @@ router.use(API.DOCTORS, availabilityRoutes);
 router.use(API.DOCTORS, prescriptionRoutes);
 router.use(API.PRESCRIPTION.BASE, prescriptionRoutes);
 router.use(API.APPOINTMENT.BASE, appointmentRoutes);
+router.use(API.RATING.BASE, ratingRoutes);
 
 export default router;

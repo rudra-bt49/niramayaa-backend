@@ -88,7 +88,8 @@ const runDoctorAvailabilityCron = async () => {
 // TEST SCHEDULE: Runs EVERY MINUTE
 // CHANGE THIS TO: '0 0 * * *' (Daily UTC Midnight) when done testing
 // -----------------------------------------------------
-cron.schedule('0 0 * * *', () => {
+console.log("[CRON] Availability cron initialized for 18:30 IST (13:30 UTC)");
+cron.schedule('30 13 * * *', () => {
     runDoctorAvailabilityCron();
 }, {
     timezone: "UTC"
