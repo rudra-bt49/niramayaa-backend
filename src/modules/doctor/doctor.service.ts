@@ -276,7 +276,9 @@ export const doctorService = {
             sort_by = 'nearest'
         } = query;
 
-        const skip = (page - 1) * limit;
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 4;
+        const skip = (pageNum - 1) * limitNum;
         const now = new Date();
 
         // 0. Just-in-time: Update past scheduled appointments to COMPLETED (only if end_at has passed)
@@ -336,7 +338,7 @@ export const doctorService = {
             prisma.appointment.findMany({
                 where,
                 skip,
-                take: limit,
+                take: limitNum,
                 orderBy,
                 include: {
                     patient: {
