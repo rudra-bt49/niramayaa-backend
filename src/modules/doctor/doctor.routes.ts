@@ -4,10 +4,7 @@ import { authMiddleware } from '../../middlewares/auth.middleware';
 import { upload } from '../../middlewares/upload.middleware';
 import { UserRole } from '../../shared/constants/roles';
 import { validate } from '../../middlewares/validate.middleware';
-import {
-    updateDoctorProfileSchema,
-    getAppointmentsQuerySchema
-} from './doctor.validator';
+import { updateDoctorProfileSchema, getAppointmentsQuerySchema } from './doctor.validator';
 import { API } from '../../shared/constants/api-routes';
 
 const router = Router();

@@ -96,41 +96,25 @@ class EmailService {
   }
 
   /**
-   * Send New Prescription Email
+   * Send Appointment Confirmation to Patient
    */
-  public async sendPrescriptionEmail(
+  public async sendAppointmentConfirmationToPatient(
     email: string,
-    patientName: string,
-    doctorName: string,
-    items: any[]
+    params: Parameters<typeof EmailTemplates.appointmentConfirmationPatient>[0]
   ): Promise<boolean> {
-    const { subject, html, text } = EmailTemplates.newPrescription(patientName, doctorName, items);
-
-    return await this.sendEmail({
-      to: email,
-      subject,
-      html,
-      text,
-    });
+    const { subject, html, text } = EmailTemplates.appointmentConfirmationPatient(params);
+    return await this.sendEmail({ to: email, subject, html, text });
   }
 
   /**
-   * Send Updated Prescription Email
+   * Send Appointment Notification to Doctor
    */
-  public async sendUpdatedPrescriptionEmail(
+  public async sendAppointmentNotificationToDoctor(
     email: string,
-    patientName: string,
-    doctorName: string,
-    items: any[]
+    params: Parameters<typeof EmailTemplates.appointmentNotificationDoctor>[0]
   ): Promise<boolean> {
-    const { subject, html, text } = EmailTemplates.updatedPrescription(patientName, doctorName, items);
-
-    return await this.sendEmail({
-      to: email,
-      subject,
-      html,
-      text,
-    });
+    const { subject, html, text } = EmailTemplates.appointmentNotificationDoctor(params);
+    return await this.sendEmail({ to: email, subject, html, text });
   }
 }
 

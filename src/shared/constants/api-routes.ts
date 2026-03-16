@@ -31,13 +31,6 @@ export const API = {
         EDIT_AVAILABILITY: '/availability/edit',
         GET_APPOINTMENTS: '/appointments',
     },
-    PRESCRIPTION: {
-        BASE: '/prescriptions',
-        BY_APPOINTMENT: '/appointment/:appointmentId',
-        // Doctor compatibility
-        CREATE: '/appointments/:appointmentId/prescription',
-        UPDATE: '/appointments/:appointmentId/prescription'
-    },
     APPOINTMENT: {
         BASE: '/appointment',
         BOOK: '/book',
