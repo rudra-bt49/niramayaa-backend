@@ -40,7 +40,9 @@ export const API = {
     },
     APPOINTMENT: {
         BASE: '/appointment',
-        BOOK: '/book'
+        BOOK: '/book',
+        GET_APPOINTMENT_STATUS: '/status/:sessionId',
+        CANCEL_APPOINTMENT: '/cancel/:sessionId',
     },
     QRCODE: {
         GET: '/qrcode',
