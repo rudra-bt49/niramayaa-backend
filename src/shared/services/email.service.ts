@@ -114,6 +114,45 @@ class EmailService {
     const { subject, html, text } = EmailTemplates.appointmentNotificationDoctor(params);
     return await this.sendEmail({ to: email, subject, html, text });
   }
+
+    /**
+   * Send New Prescription Email
+   */
+  public async sendPrescriptionEmail(
+    email: string,
+    patientName: string,
+    doctorName: string,
+    items: any[]
+  ): Promise<boolean> {
+    const { subject, html, text } = EmailTemplates.newPrescription(patientName, doctorName, items);
+
+    return await this.sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send Updated Prescription Email
+   */
+  public async sendUpdatedPrescriptionEmail(
+    email: string,
+    patientName: string,
+    doctorName: string,
+    items: any[]
+  ): Promise<boolean> {
+    const { subject, html, text } = EmailTemplates.updatedPrescription(patientName, doctorName, items);
+
+    return await this.sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+    });
+  }
+
 }
 
 export default new EmailService();
