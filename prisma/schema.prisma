@@ -458,7 +458,7 @@ model appointment {
   weight      Float
   blood_group BloodType
   description String
-
+  ai_generated_summary String?
   medical_reports     medical_report[]
   appointment_payment appointment_payment?
   rating              rating?

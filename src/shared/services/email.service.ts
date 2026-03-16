@@ -95,10 +95,8 @@ class EmailService {
     });
   }
 
-  /**
-   * Send Appointment Confirmation to Patient
-   */
-  public async sendAppointmentConfirmationToPatient(
+
+   public async sendAppointmentConfirmationToPatient(
     email: string,
     params: Parameters<typeof EmailTemplates.appointmentConfirmationPatient>[0]
   ): Promise<boolean> {

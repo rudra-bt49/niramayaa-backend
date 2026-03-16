@@ -3,8 +3,9 @@ import { BookAppointmentReqBody } from './appointment.types';
 import { stripeService } from '../../shared/services/stripe.service';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { AppointmentStatus } from '@prisma/client';
-import { convertISTToUTC, convertIstToUtc } from '../../shared/utils/timezone';
+import { convertIstToUtc } from '../../shared/utils/timezone';
 import { paymentService } from '../payment/payment.service';
+import { aiService } from '../AI/summary-generator/ai.service';
 
 export const appointmentService = {
     initiateBookingSession: async (params: {
@@ -93,10 +94,18 @@ export const appointmentService = {
             warning = "Warning: You already have an appointment booked for this time slot. You can still proceed with this booking if you wish.";
         }
 
-        // 8. Upload medical reports to Cloudinary
+        // 8. Process AI summary + upload valid medical reports to Cloudinary
+        let ai_summary: string | null = null;
         const uploadedReports: { secure_url: string; public_id: string }[] = [];
+
         if (files && files.length > 0) {
-            for (const file of files) {
+            const { ai_summary: generatedSummary, validFiles } = await aiService.processDocuments(
+                files,
+                body.description ?? ''
+            );
+            ai_summary = generatedSummary;
+
+            for (const file of validFiles) {
                 try {
                     const result = await cloudinaryService.uploadImageStream(file.buffer, 'medical_reports');
                     uploadedReports.push(result);
@@ -104,9 +113,64 @@ export const appointmentService = {
                     console.error('File upload failed', error);
                 }
             }
+        } else if (body.description?.trim()) {
+            const { ai_summary: generatedSummary } = await aiService.processDocuments([], body.description);
+            ai_summary = generatedSummary;
         }
 
-        // 9. Create Stripe Checkout Session
+        // 9. Create appointment record with PAYMENT_PENDING status upfront
+        // This stores all patient data + AI summary + reports before Stripe session.
+        // Webhook will update status to SCHEDULED or PAYMENT_FAILED.
+        const startAtUtcDate = startAtUtc;
+        const endAtUtcDate = endAtUtc;
+
+        const pendingAppointment = await prisma.$transaction(async (tx) => {
+            const appt = await tx.appointment.upsert({
+                where: {
+                    doctor_id_start_at: {
+                        doctor_id: body.doctor_id,
+                        start_at: startAtUtcDate,
+                    }
+                },
+                create: {
+                    patient_id: patient.id,
+                    doctor_id: body.doctor_id,
+                    availability_id: availability.id,
+                    start_at: startAtUtcDate,
+                    end_at: endAtUtcDate,
+                    status: AppointmentStatus.PAYMENT_PENDING,
+                    queue_token: null,
+                    name: body.name,
+                    email: body.email,
+                    phone: body.phone,
+                    height: body.height,
+                    weight: body.weight,
+                    gender: body.gender,
+                    blood_group: body.blood_group,
+                    description: body.description ?? '',
+                    ai_generated_summary: ai_summary,
+                },
+                update: {
+                    status: AppointmentStatus.PAYMENT_PENDING,
+                    ai_generated_summary: ai_summary,
+                },
+            });
+
+            if (uploadedReports.length > 0) {
+                await tx.medical_report.deleteMany({ where: { appointment_id: appt.id } });
+                await tx.medical_report.createMany({
+                    data: uploadedReports.map(r => ({
+                        appointment_id: appt.id,
+                        report_url: r.secure_url,
+                        report_public_id: r.public_id,
+                    }))
+                });
+            }
+
+            return appt;
+        });
+
+        // 10. Create Stripe Checkout Session with minimal metadata only
         const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
 
         const session = await stripeService.createAppointmentCheckoutSession({
@@ -121,17 +185,9 @@ export const appointmentService = {
                 patient_id: patient.id,
                 doctor_id: body.doctor_id,
                 availability_id: availability.id,
-                start_at: startAtUtc.toISOString(),
-                end_at: endAtUtc.toISOString(),
-                name: body.name,
+                start_at: startAtUtcDate.toISOString(),
+                end_at: endAtUtcDate.toISOString(),
                 email: body.email,
-                phone: body.phone,
-                height: body.height.toString(),
-                weight: body.weight.toString(),
-                gender: body.gender,
-                blood_group: body.blood_group,
-                description: body.description ?? '',
-                medical_reports: JSON.stringify(uploadedReports),
             }
         });
 
