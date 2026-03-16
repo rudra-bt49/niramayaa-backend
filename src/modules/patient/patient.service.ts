@@ -157,7 +157,14 @@ export const patientService = {
             sort_by
         } = query;
 
-        const skip = (page - 1) * limit;
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 4;
+        const skip = (pageNum - 1) * limitNum;
+
+        const minExpNum = min_experience !== undefined ? Number(min_experience) : undefined;
+        const minRatingNum = min_rating !== undefined ? Number(min_rating) : undefined;
+        const minFeeNum = min_fee !== undefined ? Number(min_fee) : undefined;
+        const maxFeeNum = max_fee !== undefined ? Number(max_fee) : undefined;
 
         // Base where clause for doctor_profile
         const where: Prisma.doctor_profileWhereInput = {};
@@ -199,14 +206,14 @@ export const patientService = {
             where.specialties = { hasSome: specialties };
         }
 
-        if (min_experience !== undefined) {
-            where.experience = { gte: min_experience };
+        if (minExpNum !== undefined) {
+            where.experience = { gte: minExpNum };
         }
 
-        if (min_fee !== undefined || max_fee !== undefined) {
+        if (minFeeNum !== undefined || maxFeeNum !== undefined) {
             where.consultation_fee = {};
-            if (min_fee !== undefined) where.consultation_fee.gte = min_fee;
-            if (max_fee !== undefined) where.consultation_fee.lte = max_fee;
+            if (minFeeNum !== undefined) where.consultation_fee.gte = minFeeNum;
+            if (maxFeeNum !== undefined) where.consultation_fee.lte = maxFeeNum;
         }
 
         const userWhere: Prisma.userWhereInput = {
@@ -230,13 +237,13 @@ export const patientService = {
         };
 
         // 3. Min Rating
-        if (min_rating && min_rating > 0) {
+        if (minRatingNum && minRatingNum > 0) {
             // Group ratings by doctor to find those with avg >= min_rating
             const ratingGroups = await prisma.rating.groupBy({
                 by: ['doctor_id'],
                 _avg: { rating: true },
                 having: {
-                    rating: { _avg: { gte: min_rating } }
+                    rating: { _avg: { gte: minRatingNum } }
                 }
             });
             const validDoctorIds = ratingGroups.map(g => g.doctor_id);
@@ -271,7 +278,7 @@ export const patientService = {
             prisma.doctor_profile.findMany({
                 where,
                 skip,
-                take: limit,
+                take: limitNum,
                 orderBy,
                 include: {
                     user: {
@@ -482,7 +489,9 @@ export const patientService = {
             sort_by = 'nearest'
         } = query;
 
-        const skip = (page - 1) * limit;
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 4;
+        const skip = (pageNum - 1) * limitNum;
         const now = new Date();
 
         // 0. Just-in-time: Update past scheduled appointments to COMPLETED (only if end_at has passed)
@@ -545,7 +554,7 @@ export const patientService = {
             prisma.appointment.findMany({
                 where,
                 skip,
-                take: limit,
+                take: limitNum,
                 orderBy,
                 include: {
                     doctor: {
