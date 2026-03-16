@@ -1,14 +1,12 @@
-import { PDFParse } from "pdf-parse";
+import pdf from "pdf-parse";
 
 export const aiValidator = {
   validatePDF: async (file: Express.Multer.File): Promise<void> => {
-    const parser = new (PDFParse as any)({ data: file.buffer });
-    const info = await parser.getInfo();
-    await parser.destroy();
+    const data = await pdf(file.buffer);
 
-    if (info.total > 20) {
+    if (data.numpages > 20) {
       throw new Error(
-        `"${file.originalname}" exceeds the 20-page limit (found ${info.total} pages).`
+        `"${file.originalname}" exceeds the 20-page limit (found ${data.numpages} pages).`
       );
     }
   },

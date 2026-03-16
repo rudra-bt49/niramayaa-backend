@@ -1,5 +1,5 @@
 import { InferenceClient } from "@huggingface/inference";
-import { PDFParse } from "pdf-parse";
+import pdf from "pdf-parse";
 import { MODEL_NAME, getValidationPrompt, getSummaryPrompt } from "./ai.prompts";
 import { DocumentValidationResult, DocumentResult } from "./ai.types";
 
@@ -8,10 +8,8 @@ const hf = new InferenceClient(process.env.HF_TOKEN);
 export const aiService = {
   extractFileText: async (file: Express.Multer.File): Promise<string> => {
     if (file.mimetype === "application/pdf") {
-      const parser = new (PDFParse as any)({ data: file.buffer });
-      const result = await parser.getText();
-      await parser.destroy();
-      return result.text;
+      const data = await pdf(file.buffer);
+      return data.text;
     }
     return `[Image file: ${file.originalname}]`;
   },
