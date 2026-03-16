@@ -3,7 +3,6 @@ import Stripe from 'stripe';
 import { stripeService } from "../../shared/services/stripe.service";
 import emailService from "../../shared/services/email.service";
 import { UserRole } from "../../shared/constants/roles";
-import { convertUtcToIstDate } from "../../shared/utils/timezone";
 
 export const paymentService = {
     handleWebhook: async (rawBody: string | Buffer, signature: string) => {
@@ -158,20 +157,12 @@ export const paymentService = {
             availability_id,
             start_at,
             end_at,
-            name,
             email,
-            phone,
-            height,
-            weight,
-            gender,
-            blood_group,
-            description,
-            medical_reports
         } = session.metadata || {};
 
         if (registration_type !== 'APPOINTMENT_BOOKING') {
             console.log(`ℹ️ Webhook: Skipping session ${session.id} - registration_type is ${registration_type}`);
-            return; // Ignore other types like DOCTOR_SIGNUP
+            return;
         }
 
         console.log(`🚀 Webhook: Processing appointment ${resultStatus} for ${email}...`);
@@ -188,14 +179,12 @@ export const paymentService = {
                 }
             }
 
-            const reports: { secure_url: string; public_id: string }[] = JSON.parse(medical_reports || '[]');
-
             const startDateTime = new Date(start_at as string);
             const endDateTime = new Date(end_at as string);
+            const newStatus = resultStatus === 'SUCCESS' ? 'SCHEDULED' : 'PAYMENT_FAILED';
 
-            await prisma.$transaction(async (tx) => {
-                // 1. Check if an appointment already exists for this doctor and time
-                // This prevents unique constraint violations if multiple sessions were initiated for the same slot
+            const appointment = await prisma.$transaction(async (tx) => {
+                // 1. Find the existing PAYMENT_PENDING appointment created at booking time
                 const existingAppointment = await tx.appointment.findUnique({
                     where: {
                         doctor_id_start_at: {
@@ -205,67 +194,33 @@ export const paymentService = {
                     }
                 });
 
-                // If we already have a SCHEDULED appointment, we don't want to overwrite it with a FAILURE/EXPIRED status
+                // Don't overwrite a SCHEDULED appointment with a failure
                 if (existingAppointment?.status === 'SCHEDULED' && resultStatus === 'FAILURE') {
                     console.log(`ℹ️ Webhook: Appointment already SCHEDULED for ${email}, skipping failure recording.`);
-                    return;
+                    return null;
                 }
 
-                // 2. Create or Update Appointment
-                const appointmentData = {
-                    patient_id: patient_id as string,
-                    doctor_id: doctor_id as string,
-                    availability_id: availability_id as string,
-                    start_at: startDateTime,
-                    end_at: endDateTime,
-                    status: resultStatus === 'SUCCESS' ? 'SCHEDULED' : 'PAYMENT_FAILED' as any,
-                    queue_token: null,
-                    name: name as string,
-                    email: email as string,
-                    phone: phone as string,
-                    height: parseFloat(height || '0'),
-                    weight: parseFloat(weight || '0'),
-                    gender: gender as any,
-                    blood_group: blood_group as any,
-                    description: description as string,
-                };
+                // 2. Update appointment status — all data was stored at booking time (PAYMENT_PENDING)
+                if (!existingAppointment) {
+                    console.warn(`⚠️ Webhook: No pending appointment found for doctor ${doctor_id} at ${startDateTime}. Skipping.`);
+                    return null;
+                }
 
-                const appointment = await tx.appointment.upsert({
-                    where: {
-                        doctor_id_start_at: {
-                            doctor_id: doctor_id as string,
-                            start_at: startDateTime,
-                        }
-                    },
-                    create: appointmentData,
-                    update: appointmentData,
+                const appt = await tx.appointment.update({
+                    where: { id: existingAppointment.id },
+                    data: { status: newStatus as any },
                 });
 
-                // 3. Create Medical Reports (only if it's a new appointment or we want to overwrite)
-                // For simplicity, we only create if it's a new appointment or reports aren't there
-                if (reports.length > 0) {
-                    // Delete existing reports if it's an update (to avoid duplicates)
-                    await tx.medical_report.deleteMany({ where: { appointment_id: appointment.id } });
-                    
-                    await tx.medical_report.createMany({
-                        data: reports.map(report => ({
-                            appointment_id: appointment.id,
-                            report_url: report.secure_url,
-                            report_public_id: report.public_id
-                        }))
-                    });
-                }
-
-                // 4. Create/Update Appointment Payment entry
+                // 3. Create/Update Appointment Payment entry
                 await tx.appointment_payment.upsert({
-                    where: { appointment_id: appointment.id },
+                    where: { appointment_id: appt.id },
                     create: {
-                        appointment_id: appointment.id,
+                        appointment_id: appt.id,
                         amount: (session.amount_total || 0) / 100,
                         currency: session.currency || 'inr',
                         payment_method: session.payment_method_types?.[0] || 'card',
                         payment_status: resultStatus === 'SUCCESS' ? 'paid' : (session.payment_status || 'failed'),
-                        receipt_url: receipt_url,
+                        receipt_url,
                         stripe_session_id: session.id
                     },
                     update: {
@@ -273,70 +228,68 @@ export const paymentService = {
                         currency: session.currency || 'inr',
                         payment_method: session.payment_method_types?.[0] || 'card',
                         payment_status: resultStatus === 'SUCCESS' ? 'paid' : (session.payment_status || 'failed'),
-                        receipt_url: receipt_url,
+                        receipt_url,
                         stripe_session_id: session.id
                     }
                 });
+
                 console.log(`✅ Success: Recorded appointment ${resultStatus} for ${email} via Webhook.`);
+                return appt;
             });
 
-            // 5. Send confirmation emails after successful payment (outside transaction for performance)
-            if (resultStatus === 'SUCCESS') {
+            // 4. Send confirmation emails after successful payment (outside transaction)
+            if (resultStatus === 'SUCCESS' && appointment) {
                 try {
-                    // Fetch doctor details for notification email
-                    const doctorUser = await prisma.user.findUnique({
-                        where: { id: doctor_id as string },
-                        select: { first_name: true, last_name: true, email: true }
+                    // Fetch full appointment + patient + doctor details from DB for email
+                    const fullAppointment = await prisma.appointment.findUnique({
+                        where: { id: appointment.id },
+                        include: {
+                            patient: { include: { user: { select: { first_name: true, last_name: true, email: true } } } },
+                            doctor: { include: { user: { select: { first_name: true, last_name: true, email: true } } } },
+                        }
                     });
 
-                    if (!doctorUser) {
-                        console.warn('⚠️ Webhook: Could find doctor user for email notification');
+                    if (!fullAppointment) {
+                        console.warn('⚠️ Webhook: Could not find appointment for email notification');
                     } else {
-                        const formatDateTime = (iso: string) => {
-                            const d = new Date(iso);
-                            return {
-                                date: d.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' }),
-                                time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })
-                            };
-                        };
+                        const formatDateTime = (date: Date) => ({
+                            date: date.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' }),
+                            time: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })
+                        });
 
-                        // Format blood group: O_NEG → O -, AB_POS → AB +
-                        const formatBloodGroup = (raw: string): string => {
-                            return raw.replace('_POS', ' +').replace('_NEG', ' -');
-                        };
+                        const formatBloodGroup = (raw: string): string =>
+                            raw.replace('_POS', ' +').replace('_NEG', ' -');
 
-                        const startFmt = formatDateTime(start_at as string);
-                        const endFmt = formatDateTime(end_at as string);
+                        const startFmt = formatDateTime(fullAppointment.start_at);
+                        const endFmt = formatDateTime(fullAppointment.end_at);
                         const amount = (session.amount_total || 0) / 100;
-                        const doctorName = `${doctorUser.first_name} ${doctorUser.last_name}`;
-                        const patientName = name as string;
+                        const doctorName = `${fullAppointment.doctor.user.first_name} ${fullAppointment.doctor.user.last_name}`;
+                        const patientName = fullAppointment.name;
 
                         await Promise.allSettled([
-                            // Email to patient
-                            emailService.sendAppointmentConfirmationToPatient(email as string, {
+                            emailService.sendAppointmentConfirmationToPatient(fullAppointment.email, {
                                 patientName,
                                 doctorName,
                                 date: startFmt.date,
                                 startTime: startFmt.time,
                                 endTime: endFmt.time,
-                                description: description as string,
+                                description: fullAppointment.description,
                                 amount,
                                 receiptUrl: receipt_url,
                             }),
-                            // Email to doctor
-                            emailService.sendAppointmentNotificationToDoctor(doctorUser.email, {
+                            emailService.sendAppointmentNotificationToDoctor(fullAppointment.doctor.user.email, {
                                 doctorName,
                                 patientName,
-                                patientEmail: email as string,
-                                patientPhone: phone as string,
-                                patientGender: gender as string,
-                                patientBloodGroup: formatBloodGroup(blood_group as string),
-                                patientHeight: parseFloat(height || '0'),
-                                patientWeight: parseFloat(weight || '0'),
+                                patientEmail: fullAppointment.email,
+                                patientPhone: fullAppointment.phone,
+                                patientGender: fullAppointment.gender as string,
+                                patientBloodGroup: formatBloodGroup(fullAppointment.blood_group as string),
+                                patientHeight: fullAppointment.height,
+                                patientWeight: fullAppointment.weight,
                                 date: startFmt.date,
                                 startTime: startFmt.time,
                                 endTime: endFmt.time,
-                                description: description as string,
+                                description: fullAppointment.description,
                             }),
                         ]).then(results => {
                             results.forEach((r, i) => {
