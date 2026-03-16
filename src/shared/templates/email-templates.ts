@@ -336,4 +336,91 @@ export const EmailTemplates = {
     `;
         return { subject, html, text };
     },
+
+    /**
+     * New Prescription Template
+     */
+    newPrescription: (patientName: string, doctorName: string, items: any[]) => {
+        const subject = 'Your Prescription Has Been Issued';
+        const text = `Hi ${patientName}, Dr. ${doctorName} has issued a prescription for your consultation.`;
+        const heading = 'Prescription Issued';
+        const introText = `<strong>Dr. ${doctorName}</strong> has created your prescription for the consultation. You can find the details below:`;
+
+        const html = renderPrescriptionHtml(patientName, heading, introText, items);
+        return { subject, html, text };
+    },
+
+    /**
+     * Updated Prescription Template
+     */
+    updatedPrescription: (patientName: string, doctorName: string, items: any[]) => {
+        const subject = 'Your Prescription Has Been Updated';
+        const text = `Hi ${patientName}, Dr. ${doctorName} has updated your prescription.`;
+        const heading = 'Prescription Updated';
+        const introText = `<strong>Dr. ${doctorName}</strong> has updated your prescription. Please review the latest version below:`;
+
+        const html = renderPrescriptionHtml(patientName, heading, introText, items);
+        return { subject, html, text };
+    }
+};
+
+/**
+ * Shared Helper for Prescription HTML formatting
+ */
+const renderPrescriptionHtml = (patientName: string, heading: string, introText: string, items: any[]) => {
+    const prescriptionItemsHtml = items.map(item => `
+        <div style="padding: 15px; border-bottom: 1px solid #f1f5f9;">
+            <p style="margin: 0; font-weight: bold; color: #1e293b;">${item.medicine_name}</p>
+            <p style="margin: 5px 0; font-size: 0.9rem; color: #64748b;">
+                Dosage: ${item.dosage_value} ${item.dosage_unit} | 
+                Timing: ${item.timing.replace('_', ' ')}
+            </p>
+            <p style="margin: 5px 0; font-size: 0.85rem;">
+                Schedule: 
+                ${item.morning ? '<span style="color: #059669;">Morning</span>' : ''} 
+                ${item.afternoon ? '<span style="color: #059669;">Afternoon</span>' : ''} 
+                ${item.night ? '<span style="color: #059669;">Night</span>' : ''}
+            </p>
+            ${item.note ? `<p style="margin: 5px 0; font-size: 0.85rem; font-style: italic; color: #64748b;">Note: ${item.note}</p>` : ''}
+        </div>
+    `).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; }
+          .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+          .content { padding: 30px; line-height: 1.6; color: #1e293b; background-color: #ffffff; }
+          .prescription-box { background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; margin: 20px 0; overflow: hidden; }
+          .footer { text-align: center; font-size: 0.75rem; color: #64748b; margin-top: 20px; padding: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">${heading}</h1>
+            <p style="margin:10px 0 0 0; opacity: 0.9;">Niramayaa Healthcare</p>
+          </div>
+          <div class="content">
+            <p>Hi <strong>${patientName}</strong>,</p>
+            <p>${introText}</p>
+            
+            <div class="prescription-box">
+                <div style="background-color: #f1f5f9; padding: 10px 15px; font-weight: bold; font-size: 0.85rem; color: #475569;">MEDICINE DETAILS</div>
+                ${prescriptionItemsHtml}
+            </div>
+
+            <p>You can also view this prescription in your Niramayaa patient dashboard at any time.</p>
+            <p>Please follow the dosage instructions carefully. If you have any questions or experience side effects, please contact your doctor immediately.</p>
+            <p>Best regards,<br />The Niramayaa Team</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 Niramayaa Healthcare. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
 };
