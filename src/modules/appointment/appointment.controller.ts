@@ -15,7 +15,7 @@ export const appointmentController = {
         const body = req.body as BookAppointmentReqBody;
         const files = req.files as Express.Multer.File[];
 
-        const sessionUrl = await appointmentService.initiateBookingSession({
+        const { checkoutUrl, warning } = await appointmentService.initiateBookingSession({
             userId,
             body,
             files: files || []
@@ -23,10 +23,42 @@ export const appointmentController = {
 
         res.status(200).json({
             success: true,
-            message: 'Checkout session created successfully',
+            message: warning || 'Checkout session created successfully',
             data: {
-                checkoutUrl: sessionUrl
+                checkoutUrl
             }
+        });
+    }),
+
+    getAppointmentStatus: asyncHandler(async (req: Request, res: Response) => {
+        const { sessionId } = req.params;
+
+        if (!sessionId) {
+            res.status(400).json({ success: false, message: 'Session ID is required' });
+            return;
+        }
+
+        const data = await appointmentService.getAppointmentBySessionId(sessionId as string);
+
+        res.status(200).json({
+            success: true,
+            data
+        });
+    }),
+
+    handleCancel: asyncHandler(async (req: Request, res: Response) => {
+        const { sessionId } = req.params;
+
+        if (!sessionId) {
+            res.status(400).json({ success: false, message: 'Session ID is required' });
+            return;
+        }
+
+        await appointmentService.handleCancelledBooking(sessionId as string);
+
+        res.status(200).json({
+            success: true,
+            message: 'Appointment cancellation recorded successfully'
         });
     }),
 };
