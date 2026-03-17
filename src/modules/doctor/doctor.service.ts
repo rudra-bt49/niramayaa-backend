@@ -2,10 +2,11 @@ import prisma from '../../prisma/prisma';
 import bcrypt from 'bcrypt';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { IUpdateDoctorProfileRequest, IUpdateDoctorProfileResponse } from './doctor.profile.types';
-import { convertUtcToIstDate } from '../../shared/utils/timezone';
+import { convertUtcToIstDate, convertISTToUTC, convertIstToUtc } from '../../shared/utils/timezone';
 import { IGetDoctorAppointmentsQuery } from './doctor.validator';
 import { appointment_status } from '../../shared/constants/appointment-status';
 import { doctor_appointment_tabs } from '../../shared/constants/appointment-tabs';
+import { doctor_plan } from '../../shared/constants/doctor-plan';
 import { Prisma } from '@prisma/client';
 
 export const doctorService = {
@@ -425,6 +426,225 @@ export const doctorService = {
                 current_page: page,
                 limit
             }
+        };
+    },
+
+    getAnalytics: async (doctorId: string, planName?: string, fromStr?: string, toStr?: string) => {
+        // Total unique patients
+        const uniquePatientsCount = await prisma.appointment.groupBy({
+            by: ['patient_id'],
+            where: { doctor_id: doctorId },
+            _count: true
+        }).then(res => res.length);
+
+        // Total revenue from COMPLETED appointments
+        const completedAppointments = await prisma.appointment.findMany({
+            where: { doctor_id: doctorId, status: appointment_status.COMPLETED },
+            include: { appointment_payment: true }
+        });
+        const totalRevenue = completedAppointments.reduce((sum, app) => sum + (app.appointment_payment?.amount || 0), 0);
+
+        // Appointment status breakdown
+        const statusBreakdown = await prisma.appointment.groupBy({
+            by: ['status'],
+            where: { doctor_id: doctorId },
+            _count: {
+                id: true
+            }
+        });
+
+        const totalAppointments = await prisma.appointment.count({
+            where: { doctor_id: doctorId }
+        });
+
+        const now = new Date();
+        
+        // Define IST Today boundaries in UTC
+        const istTodayStart = convertISTToUTC('00:00', now);
+        const istTodayEnd = convertISTToUTC('23:59:59', now);
+        istTodayEnd.setMilliseconds(999);
+
+        // Default range: Last 7 IST days
+        let fromDate: Date;
+        let toDate: Date;
+
+        if (fromStr && toStr) {
+            fromDate = convertIstToUtc(fromStr);
+            fromDate.setHours(0, 0, 0, 0);
+            toDate = convertIstToUtc(toStr);
+            toDate.setHours(23, 59, 59, 999);
+        } else {
+            toDate = new Date(istTodayEnd);
+            fromDate = new Date(istTodayStart);
+            fromDate.setDate(fromDate.getDate() - 6);
+        }
+
+        // Calculate number of days in range
+        const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
+        const daysInRange = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        const recentAppointments = await prisma.appointment.findMany({
+            where: {
+                doctor_id: doctorId,
+                start_at: {
+                    gte: fromDate,
+                    lte: toDate
+                }
+            },
+            select: {
+                start_at: true,
+                status: true,
+                appointment_payment: { select: { amount: true } }
+            }
+        });
+
+        // Initialize daily stats within the range
+        const dailyStats: Record<string, { appointments: number, revenue: number }> = {};
+        for (let i = 0; i < daysInRange; i++) {
+            const d = new Date(fromDate);
+            d.setDate(d.getDate() + i);
+            const istD = convertUtcToIstDate(d);
+            if (!istD) continue;
+            const dateStr = istD.toISOString().split('T')[0];
+            dailyStats[dateStr] = { appointments: 0, revenue: 0 };
+        }
+
+        recentAppointments.forEach(app => {
+            const istDate = convertUtcToIstDate(app.start_at);
+            if (!istDate) return;
+            const dateStr = istDate.toISOString().split('T')[0];
+            if (dailyStats[dateStr]) {
+                dailyStats[dateStr].appointments += 1;
+                if (app.status === appointment_status.COMPLETED) {
+                    dailyStats[dateStr].revenue += (app.appointment_payment?.amount || 0);
+                }
+            }
+        });
+
+        const trend = Object.entries(dailyStats).map(([date, stats]) => ({
+            date,
+            ...stats
+        }));
+
+        let extra_metrics: any = {};
+        
+        if (planName === doctor_plan.PRO) {
+            const upcomingBookings = await prisma.appointment.count({
+                where: {
+                    doctor_id: doctorId,
+                    status: appointment_status.SCHEDULED,
+                    start_at: { gt: now }
+                }
+            });
+
+            // Calculate completion rate based on historical appointments (completed vs all non-scheduled/non-ongoing)
+            const historicalCount = totalAppointments - upcomingBookings;
+            const completedCount = statusBreakdown.find(s => s.status === appointment_status.COMPLETED)?._count.id || 0;
+            const completionRate = historicalCount > 0 ? Math.round((completedCount / historicalCount) * 100) : 0;
+
+            extra_metrics = {
+                upcoming_bookings: upcomingBookings,
+                completion_rate: completionRate
+            };
+        } else if (planName === doctor_plan.ELITE) {
+            const todaysWalkins = await prisma.appointment.count({
+                where: {
+                    doctor_id: doctorId,
+                    created_at: { gte: istTodayStart, lte: istTodayEnd }
+                }
+            });
+
+            const currentWaitingList = await prisma.appointment.count({
+                where: {
+                    doctor_id: doctorId,
+                    start_at: { gte: istTodayStart, lte: istTodayEnd },
+                    status: appointment_status.SCHEDULED
+                }
+            });
+
+            extra_metrics = {
+                todays_walkins: todaysWalkins,
+                current_waiting_list: currentWaitingList
+            };
+        }
+
+        // --- ADVANCED ANALYTICS ---
+
+        // 1. Average Rating
+        const avgRatingAgg = await prisma.rating.aggregate({
+            _avg: { rating: true },
+            where: { doctor_id: doctorId }
+        });
+        const averageRating = avgRatingAgg._avg.rating ? Number(avgRatingAgg._avg.rating.toFixed(1)) : null;
+
+        // 2. Repeat Patients
+        const patientCounts = await prisma.appointment.groupBy({
+            by: ['patient_id'],
+            where: { doctor_id: doctorId },
+            _count: { id: true }
+        });
+        const repeatPatients = patientCounts.filter(p => p._count.id > 1).length;
+        const totalUniquePatients = patientCounts.length;
+        const repeatPatientPercentage = totalUniquePatients > 0 
+            ? Math.round((repeatPatients / totalUniquePatients) * 100) 
+            : 0;
+
+        // 3. Insight of the Day (Peak Hour & Busiest Day)
+        let insightOfTheDay = "Welcome to your powerful analytics dashboard."; // default backup
+        if (totalAppointments > 0) {
+            const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayCounts = Array(7).fill(0);
+            const hourCounts = Array(24).fill(0);
+
+            // Use recentAppointments (which is already filtered by the date range!) to find trends
+            if (recentAppointments.length > 0) {
+                 recentAppointments.forEach(app => {
+                    const d = convertUtcToIstDate(app.start_at);
+                    if(d) {
+                        dayCounts[d.getDay()]++;
+                        hourCounts[d.getHours()]++;
+                    }
+                });
+
+                const busiestDayIndex = dayCounts.indexOf(Math.max(...dayCounts));
+                const busiestHourIndex = hourCounts.indexOf(Math.max(...hourCounts));
+                
+                // Format hour cleanly (e.g. 14 -> 2 PM)
+                const ampm = busiestHourIndex >= 12 ? 'PM' : 'AM';
+                const formattedHour = busiestHourIndex % 12 === 0 ? 12 : busiestHourIndex % 12;
+                const nextHour = (busiestHourIndex + 1) % 12 === 0 ? 12 : (busiestHourIndex + 1) % 12;
+
+                insightOfTheDay = `Your busiest day is ${daysOfWeek[busiestDayIndex]}. Most patients visit between ${formattedHour}–${nextHour} ${ampm}.`;
+            } else {
+                 insightOfTheDay = "Analytics currently focusing on chosen date range. Not enough data today to form a peak insight.";
+            }
+        }
+
+        // 4. Total Prescriptions Issued
+        const totalPrescriptions = await prisma.prescription.count({
+            where: {
+                appointment: {
+                    doctor_id: doctorId
+                }
+            }
+        });
+
+        // 5. Total Failed Payments
+        const totalFailedPayments = statusBreakdown.find(s => s.status === appointment_status.PAYMENT_FAILED)?._count.id || 0;
+
+        return {
+            plan_type: planName || doctor_plan.PRO,
+            total_patients: uniquePatientsCount,
+            total_revenue: totalRevenue,
+            total_appointments: totalAppointments,
+            status_breakdown: statusBreakdown.map(s => ({ status: s.status, count: s._count.id })),
+            trend,
+            average_rating: averageRating,
+            repeat_patient_percentage: repeatPatientPercentage,
+            insight_of_the_day: insightOfTheDay,
+            total_prescriptions: totalPrescriptions,
+            total_failed_payments: totalFailedPayments,
+            extra_metrics
         };
     }
 };

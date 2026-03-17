@@ -39,4 +39,10 @@ router.get(
     doctorController.getAppointments
 );
 
+router.get(
+    API.DOCTOR_EXTRA.GET_ANALYTICS,
+    authMiddleware([UserRole.DOCTOR]),
+    doctorController.getAnalytics
+);
+
 export default router;
