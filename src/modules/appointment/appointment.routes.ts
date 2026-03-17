@@ -41,4 +41,11 @@ router.get(
 
 router.post(API.APPOINTMENT.CANCEL_APPOINTMENT, authMiddleware([UserRole.PATIENT]), appointmentController.handleCancel);
 
+router.patch(
+    API.APPOINTMENT.EDIT_REPORTS,
+    authMiddleware([UserRole.PATIENT]),
+    upload.array('reports', 5),
+    appointmentController.updateMedicalReports
+);
+
 export default router;

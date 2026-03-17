@@ -45,6 +45,7 @@ export const API = {
         BOOK: '/book',
         GET_APPOINTMENT_STATUS: '/status/:sessionId',
         CANCEL_APPOINTMENT: '/cancel/:sessionId',
+        EDIT_REPORTS: '/edit-reports',
     },
     QRCODE: {
         GET: '/qrcode',
