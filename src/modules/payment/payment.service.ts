@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { stripeService } from "../../shared/services/stripe.service";
 import emailService from "../../shared/services/email.service";
 import { UserRole } from "../../shared/constants/roles";
+import { qstashService } from "../../shared/services/qstash.service";
 
 export const paymentService = {
     handleWebhook: async (rawBody: string | Buffer, signature: string) => {
@@ -27,6 +28,7 @@ export const paymentService = {
                 console.log("Processing checkout.session.completed...");
                 await paymentService.handleCompletedSubscription(event.data.object as Stripe.Checkout.Session);
                 await paymentService.handleAppointmentSession(event.data.object as Stripe.Checkout.Session, 'SUCCESS');
+                await paymentService.handleGuestWalkinSession(event.data.object as Stripe.Checkout.Session);
                 break;
             case 'checkout.session.expired':
                 console.log(`⚠️ Webhook: Session ${event.data.object.id} expired. Handling as failure if applicable.`);
@@ -161,7 +163,6 @@ export const paymentService = {
         } = session.metadata || {};
 
         if (registration_type !== 'APPOINTMENT_BOOKING') {
-            console.log(`ℹ️ Webhook: Skipping session ${session.id} - registration_type is ${registration_type}`);
             return;
         }
 
@@ -309,6 +310,28 @@ export const paymentService = {
         } catch (error) {
             console.error(`❌ Webhook Error processing appointment ${resultStatus} creation:`, error);
             throw error;
+        }
+    },
+
+    handleGuestWalkinSession: async (session: Stripe.Checkout.Session) => {
+        const { registration_type } = session.metadata || {};
+
+        if (registration_type !== 'GUEST_WALKIN') {
+            return;
+        }
+
+        console.log(`🚀 Webhook: Forwarding GUEST_WALKIN session ${session.id} to QStash...`);
+
+        try {
+            await qstashService.publishToQueue({
+                session_id: session.id,
+                metadata: session.metadata,
+                status: session.payment_status,
+                amount: session.amount_total
+            });
+            console.log(`✅ Success: Forwarded session ${session.id} to QStash.`);
+        } catch (error) {
+            console.error(`❌ Webhook Error forwarding to QStash:`, error);
         }
     }
 };

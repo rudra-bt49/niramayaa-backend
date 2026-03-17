@@ -9,6 +9,8 @@ import appointmentRoutes from "../modules/appointment/appointment.routes";
 import prescriptionRoutes from "../modules/prescription/prescription.routes";
 import chatbotRoutes from "../modules/chatbot/chatbot.routes"
 import ratingRoutes from "../modules/rating/rating.routes";
+import publicRoutes from "../modules/public/public.routes";
+import { publicController } from "../modules/public/public.controller";
 import { API } from "../shared/constants/api-routes";
 
 const router = Router();
@@ -24,5 +26,9 @@ router.use(API.PRESCRIPTION.BASE, prescriptionRoutes);
 router.use(API.APPOINTMENT.BASE, appointmentRoutes);
 router.use(chatbotRoutes)
 router.use(API.RATING.BASE, ratingRoutes);
+router.use(API.PUBLIC.BASE, publicRoutes);
+
+// QStash Webhook mounted directly at /api/qstash/webhook
+router.post(API.QUEUE.WEBHOOK, publicController.handleQStashWebhook);
 
 export default router;
