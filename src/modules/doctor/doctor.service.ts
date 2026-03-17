@@ -412,6 +412,7 @@ export const doctorService = {
                 blood_group: app.blood_group,
                 allergies: app.patient.allergies,
                 rating_details: app.rating,
+                ai_generated_summary: app.ai_generated_summary,
                 prescription: app.prescription
             };
         });

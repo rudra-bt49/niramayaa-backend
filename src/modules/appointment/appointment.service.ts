@@ -270,5 +270,113 @@ export const appointmentService = {
         // Process as failure
         await paymentService.handleAppointmentSession(session as any, 'FAILURE');
         return { success: true };
+    },
+
+    updateMedicalReports: async (params: {
+        userId: string;
+        appointmentId: string;
+        existingReportIds: string[];
+        newFiles: Express.Multer.File[];
+    }) => {
+        const { userId, appointmentId, existingReportIds, newFiles } = params;
+
+        // 1. Verify appointment exists and belongs to the patient
+        const appointment = await prisma.appointment.findUnique({
+            where: { id: appointmentId },
+            include: { medical_reports: true }
+        });
+
+        if (!appointment) {
+            throw new Error('Appointment not found');
+        }
+
+        if (appointment.patient_id !== userId) {
+            throw new Error('Unauthorized: You do not own this appointment');
+        }
+
+        if (appointment.status !== AppointmentStatus.SCHEDULED) {
+            throw new Error('Only scheduled appointments can be edited'); // Case-sensitive or Enum? Schema uses SCHEDULED.
+        }
+
+        // 2. Identify reports to delete
+        const reportsToDelete = appointment.medical_reports.filter(
+            r => !existingReportIds.includes(r.id)
+        );
+
+        // 3. Process AI summary + upload valid medical reports to Cloudinary (Reusing existing logic)
+        let ai_summary: string | null = null;
+        let validFilesToUpload: Express.Multer.File[] = [];
+
+        if (newFiles && newFiles.length > 0) {
+            const { ai_summary: generatedSummary, validFiles } = await aiService.processDocuments(
+                newFiles,
+                appointment.description ?? ''
+            );
+            ai_summary = generatedSummary;
+            validFilesToUpload = validFiles;
+        } else if (appointment.description?.trim()) {
+            const { ai_summary: generatedSummary } = await aiService.processDocuments([], appointment.description);
+            ai_summary = generatedSummary;
+        }
+
+        // 4. Check final count (Max 5)
+        const totalCount = existingReportIds.length + validFilesToUpload.length;
+        if (totalCount > 5) {
+            throw new Error('Maximum 5 medical reports allowed per appointment');
+        }
+
+        // 5. Perform Cloudinary Deletions
+        for (const report of reportsToDelete) {
+            if (report.report_public_id) {
+                try {
+                    await cloudinaryService.deleteImage(report.report_public_id);
+                } catch (error) {
+                    console.error(`Failed to delete report ${report.id} from Cloudinary:`, error);
+                }
+            }
+        }
+
+        // 6. Upload Valid New Reports to Cloudinary
+        const uploadedReports: { secure_url: string; public_id: string }[] = [];
+        for (const file of validFilesToUpload) {
+            try {
+                const result = await cloudinaryService.uploadImageStream(file.buffer, 'medical_reports');
+                uploadedReports.push(result);
+            } catch (error) {
+                console.error('File upload failed during edit', error);
+                throw new Error('Failed to upload one or more medical reports');
+            }
+        }
+
+        // 7. DB Update in Transaction
+        await prisma.$transaction(async (tx) => {
+            // Update appointment AI summary
+            await tx.appointment.update({
+                where: { id: appointmentId },
+                data: { ai_generated_summary: ai_summary }
+            });
+
+            // Delete removed reports from DB
+            if (reportsToDelete.length > 0) {
+                await tx.medical_report.deleteMany({
+                    where: {
+                        id: { in: reportsToDelete.map(r => r.id) }
+                    }
+                });
+            }
+
+            // Create new reports in DB
+            if (uploadedReports.length > 0) {
+                await tx.medical_report.createMany({
+                    data: uploadedReports.map(r => ({
+                        appointment_id: appointmentId,
+                        report_url: r.secure_url,
+                        report_public_id: r.public_id,
+                    }))
+                });
+            }
+        });
+
+        return { success: true, message: 'Medical reports and AI summary updated successfully' };
     }
 };
