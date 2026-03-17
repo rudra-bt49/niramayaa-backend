@@ -57,4 +57,12 @@ export const API = {
     RATING: {
         BASE: '/ratings',
     },
+    PUBLIC: {
+        BASE: '/public',
+        DOCTOR_STATUS: '/doctor/:doctorId/status',
+        BOOK_GUEST: '/doctor/:doctorId/book-guest',
+    },
+    QUEUE: {
+        WEBHOOK: '/qstash/webhook',
+    }
 };

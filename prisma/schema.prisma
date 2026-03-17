@@ -433,8 +433,8 @@ model availability {
 model appointment {
   id String @id @default(uuid())
 
-  patient_id String
-  patient    patient_profile @relation("PatientAppointments", fields: [patient_id], references: [user_id], onDelete: Cascade)
+  patient_id String?
+  patient    patient_profile? @relation("PatientAppointments", fields: [patient_id], references: [user_id], onDelete: Cascade)
 
   doctor_id String
   doctor    doctor_profile @relation("DoctorAppointments", fields: [doctor_id], references: [user_id], onDelete: Cascade)

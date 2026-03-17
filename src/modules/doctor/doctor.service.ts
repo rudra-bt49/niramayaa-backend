@@ -381,22 +381,30 @@ export const doctorService = {
 
         // 4. Formatting
         const formattedAppointments = appointments.map(app => {
-            // Calculate age
-            const dob = new Date(app.patient.user.dob);
-            const today = new Date();
-            let age = today.getFullYear() - dob.getFullYear();
-            const m = today.getMonth() - dob.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-                age--;
+            // Handle guest vs registered patient data
+            const isGuest = !app.patient;
+            
+            // Calculate age only if patient profile exists
+            let age = null;
+            let dob = null;
+            if (app.patient?.user.dob) {
+                dob = new Date(app.patient.user.dob);
+                const today = new Date();
+                age = today.getFullYear() - dob.getFullYear();
+                const m = today.getMonth() - dob.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                    age--;
+                }
             }
 
             return {
                 id: app.id,
                 patient_id: app.patient_id,
-                patient_name: `${app.patient.user.first_name} ${app.patient.user.last_name}`,
-                patient_avatar: app.patient.user.profile_image,
-                patient_email: app.patient.user.email,
-                patient_phone: app.patient.user.phone_number,
+                // Use guest fields if patient profile is missing
+                patient_name: isGuest ? app.name : `${app.patient?.user.first_name} ${app.patient?.user.last_name}`,
+                patient_avatar: isGuest ? null : app.patient?.user.profile_image,
+                patient_email: isGuest ? app.email : app.patient?.user.email,
+                patient_phone: isGuest ? app.phone : app.patient?.user.phone_number,
                 patient_age: age,
                 patient_dob: dob,
                 start_time: convertUtcToIstDate(app.start_at),
@@ -410,7 +418,7 @@ export const doctorService = {
                 height: app.height,
                 weight: app.weight,
                 blood_group: app.blood_group,
-                allergies: app.patient.allergies,
+                allergies: isGuest ? null : app.patient?.allergies,
                 rating_details: app.rating,
                 ai_generated_summary: app.ai_generated_summary,
                 prescription: app.prescription

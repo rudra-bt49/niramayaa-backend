@@ -98,15 +98,24 @@ export const prescriptionService = {
         });
 
         // 6. Send Email (Async)
-        const patientName = `${appointment.patient.user.first_name} ${appointment.patient.user.last_name}`;
-        const doctorName = `${appointment.doctor.user.first_name} ${appointment.doctor.user.last_name}`;
+        const patientName = appointment.patient 
+            ? `${appointment.patient.user.first_name} ${appointment.patient.user.last_name}`
+            : appointment.name || 'Guest Patient';
+            
+        const patientEmail = appointment.patient 
+            ? appointment.patient.user.email 
+            : appointment.email;
 
-        emailService.sendPrescriptionEmail(
-            appointment.patient.user.email,
-            patientName,
-            doctorName,
-            data.items
-        ).catch(err => console.error("Failed to send prescription email:", err));
+        const doctorName = `${appointment.doctor.user.first_name} ${appointment.doctor.user.last_name}`;
+        
+        if (patientEmail) {
+            emailService.sendPrescriptionEmail(
+                patientEmail,
+                patientName,
+                doctorName,
+                data.items
+            ).catch(err => console.error("Failed to send prescription email:", err));
+        }
 
         return result;
     },
@@ -194,15 +203,25 @@ export const prescriptionService = {
         });
 
         // 4. Send Updated Email (Async)
-        const patientName = `${existingPrescription.appointment.patient.user.first_name} ${existingPrescription.appointment.patient.user.last_name}`;
-        const doctorName = `${existingPrescription.appointment.doctor.user.first_name} ${existingPrescription.appointment.doctor.user.last_name}`;
+        const appointment = existingPrescription.appointment;
+        const patientName = appointment.patient 
+            ? `${appointment.patient.user.first_name} ${appointment.patient.user.last_name}`
+            : appointment.name || 'Guest Patient';
+            
+        const patientEmail = appointment.patient 
+            ? appointment.patient.user.email 
+            : appointment.email;
 
-        emailService.sendUpdatedPrescriptionEmail(
-            existingPrescription.appointment.patient.user.email,
-            patientName,
-            doctorName,
-            data.items
-        ).catch(err => console.error("Failed to send updated prescription email:", err));
+        const doctorName = `${appointment.doctor.user.first_name} ${appointment.doctor.user.last_name}`;
+
+        if (patientEmail) {
+            emailService.sendUpdatedPrescriptionEmail(
+                patientEmail,
+                patientName,
+                doctorName,
+                data.items
+            ).catch(err => console.error("Failed to send updated prescription email:", err));
+        }
 
         return result;
     },

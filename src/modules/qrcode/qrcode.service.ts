@@ -110,5 +110,28 @@ export const qrcodeService = {
             qrcode_token: `${clientUrl}/appointments/book/${updatedProfile.qrcode_token}`,
             qrcode_image_url: updatedProfile.qrcode_image_url as string
         };
+    },
+
+    /**
+     * Decrypts the token from the QR code back into the doctor's user_id
+     */
+    decryptToken: (token: string): string => {
+        try {
+            const [ivHex, encrypted] = token.split(':');
+            if (!ivHex || !encrypted) return token; // Return as-is if not in token format
+
+            const iv = Buffer.from(ivHex, 'hex');
+            const secretKey = process.env.ACCESS_TOKEN_SECRET;
+            const key = crypto.createHash('sha256').update(String(secretKey)).digest('base64').substring(0, 32);
+
+            const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+
+            return decrypted;
+        } catch (error) {
+            console.error('❌ Failed to decrypt QR token:', error);
+            return token; // Fallback to original
+        }
     }
 };
