@@ -55,5 +55,19 @@ export const doctorController = {
         const result = await doctorService.getAppointments(userId, query);
 
         res.status(200).json(ApiResponse.success(result, 'Appointments fetched successfully'));
+    }),
+
+    getAnalytics: asyncHandler(async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId;
+        const planName = req.user?.plan_name;
+
+        if (!userId) {
+            res.status(401).json(ApiResponse.error('Unauthorized', 401));
+            return;
+        }
+
+        const { from, to } = req.query as { from?: string, to?: string };
+        const analytics = await doctorService.getAnalytics(userId, planName, from, to);
+        res.status(200).json(ApiResponse.success(analytics, 'Analytics fetched successfully'));
     })
 };

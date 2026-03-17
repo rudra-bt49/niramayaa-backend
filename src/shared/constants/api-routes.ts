@@ -30,6 +30,7 @@ export const API = {
         GET_AVAILABILITY: '/availability',
         EDIT_AVAILABILITY: '/availability/edit',
         GET_APPOINTMENTS: '/appointments',
+        GET_ANALYTICS: '/analytics',
     },
     PRESCRIPTION: {
         BASE: '/prescriptions',
