@@ -190,7 +190,31 @@ export const appointmentService = {
                 email: body.email,
             }
         });
+        // 11. NEW: Create the pending payment record in the database
+        // We use upsert so if the user clicks "book" again while it's pending, it just updates the session ID
+        await prisma.appointment_payment.upsert({
+            where: { appointment_id: pendingAppointment.id },
+            create: {
+                appointment_id: pendingAppointment.id,
+                amount: doctor.doctor_profile.consultation_fee,
+                currency: 'inr', 
+                payment_method: 'card', 
+                payment_status: 'pending', // Marks it as pending for your dashboard
+                stripe_session_id: session.id,
+                
+                // Note: If your Prisma schema has a column to store the checkout URL 
+                // for the dashboard, add it here (e.g., checkout_url: session.url)
+            },
+            update: {
+                amount: doctor.doctor_profile.consultation_fee,
+                currency: 'inr',
+                payment_method: 'card',
+                payment_status: 'pending',
+                stripe_session_id: session.id,
+            }
+        });
 
+      
         return { checkoutUrl: session.url as string, warning };
     },
 

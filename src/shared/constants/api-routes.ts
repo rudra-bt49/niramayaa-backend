@@ -24,6 +24,7 @@ export const API = {
     PATIENTS: {
         GET_DOCTOR_AVAILABILITY: '/patients/availability/:doctorId',
         GET_APPOINTMENTS: '/patients/appointments',
+        CHAT: '/patients/chat'
     },
     DOCTORS: "/doctors",
     DOCTOR_EXTRA: {
