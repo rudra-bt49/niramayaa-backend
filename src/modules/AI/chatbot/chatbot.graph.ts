@@ -4,8 +4,8 @@ import { AIMessage } from "@langchain/core/messages";
 import { AgentState, PatientDetailsSchema } from "./chatbot.types";
 import { getExtractionPrompt, getConversationalPrompt } from "./chatbot.prompts";
 import { cleanExtractedData } from "./chatbot.util";
-import { appointmentService } from "../appointment/appointment.service";
-import prisma from "../../prisma/prisma"; 
+import { appointmentService } from "../../appointment/appointment.service";
+import prisma from "../../../prisma/prisma"; 
 
 const llm = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,

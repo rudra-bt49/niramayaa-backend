@@ -463,7 +463,8 @@ model appointment {
   appointment_payment appointment_payment?
   rating              rating?
   prescription        prescription?
-
+  call_id       String?
+  call_status   String?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

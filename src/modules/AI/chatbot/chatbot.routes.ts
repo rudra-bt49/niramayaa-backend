@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { chatController } from './chatbot.controller';
-import { API } from '../../shared/constants/api-routes'; // 👉 Adjust this path to wherever your API constant lives
-import { authMiddleware } from '../../middlewares/auth.middleware'; // Use your actual auth middleware
-import { UserRole } from '../../shared/constants/roles';
+import { API } from '../../../shared/constants/api-routes'; 
+import { authMiddleware } from '../../../middlewares/auth.middleware'; 
+import { UserRole } from '../../../shared/constants/roles';
 
 const router = Router();
 

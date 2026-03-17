@@ -7,8 +7,9 @@ import qrcodeRoutes from "../modules/qrcode/qrcode.routes";
 import availabilityRoutes from "../modules/availability/availability.routes";
 import appointmentRoutes from "../modules/appointment/appointment.routes";
 import prescriptionRoutes from "../modules/prescription/prescription.routes";
-import chatbotRoutes from "../modules/chatbot/chatbot.routes"
+import chatbotRoutes from "../modules/AI/chatbot/chatbot.routes"
 import ratingRoutes from "../modules/rating/rating.routes";
+import callagentRoutes from "../modules/AI/callagent/voice.routes"
 import publicRoutes from "../modules/public/public.routes";
 import { publicController } from "../modules/public/public.controller";
 import { API } from "../shared/constants/api-routes";
@@ -24,7 +25,8 @@ router.use(API.DOCTORS, availabilityRoutes);
 router.use(API.DOCTORS, prescriptionRoutes);
 router.use(API.PRESCRIPTION.BASE, prescriptionRoutes);
 router.use(API.APPOINTMENT.BASE, appointmentRoutes);
-router.use(chatbotRoutes)
+router.use(chatbotRoutes) 
+router.use(callagentRoutes) 
 router.use(API.RATING.BASE, ratingRoutes);
 router.use(API.PUBLIC.BASE, publicRoutes);
 
