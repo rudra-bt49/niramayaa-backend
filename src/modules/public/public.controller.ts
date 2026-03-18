@@ -18,7 +18,8 @@ export const publicController = {
     initiateGuestBooking: asyncHandler(async (req: Request, res: Response) => {
         const { doctorId } = req.params as { doctorId: string };
         try {
-            const result = await publicService.createGuestCheckoutSession(doctorId, req.body);
+            const files = req.files as Express.Multer.File[];
+            const result = await publicService.createGuestCheckoutSession(doctorId, req.body, files);
             res.status(200).json(ApiResponse.success(result, 'Checkout session created'));
         } catch (error: any) {
             const status = error.status || 500;
