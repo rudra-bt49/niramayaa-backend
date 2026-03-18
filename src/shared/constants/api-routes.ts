@@ -24,7 +24,9 @@ export const API = {
     PATIENTS: {
         GET_DOCTOR_AVAILABILITY: '/patients/availability/:doctorId',
         GET_APPOINTMENTS: '/patients/appointments',
-        CHAT: '/patients/chat'
+        CHAT: '/patients/chat',
+        VOICE_CALL:'/patients/voice/start',
+        VAPI_WEBHOOK:'/payments/vapi-webhook'
     },
     DOCTORS: "/doctors",
     DOCTOR_EXTRA: {

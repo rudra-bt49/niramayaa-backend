@@ -12,6 +12,9 @@ export interface BookAppointmentReqBody {
     gender: Gender;
     blood_group: BloodType;
     description: string;
+
+    call_id?: string;
+    call_status?: string;
 }
 
 export interface BookAppointmentResponse {

@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { chatBookingService } from './chatbot.service';
 import { BookingContext } from './chatbot.types';
-import { AuthRequest } from '../../middlewares/auth.middleware'; // Adjust path if needed
+import { AuthRequest } from '../../../middlewares/auth.middleware'; 
 
 export const chatController = async (req: AuthRequest, res: Response): Promise<void> => {
     // 1. Ensure files defaults to an empty array if undefined
