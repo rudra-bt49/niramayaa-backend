@@ -26,6 +26,17 @@ export const authService = {
     sendVerificationOtp: async (data: ISendVerificationOtpRequest) => {
         const { email } = data;
 
+        // 0. Check if user already exists
+        const existingUser = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (existingUser) {
+            const error: any = new Error("User with this email already exists");
+            error.statusCode = 400;
+            throw error;
+        }
+
         // 1. Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
