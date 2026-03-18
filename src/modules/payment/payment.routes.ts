@@ -17,4 +17,9 @@ router.post(
     paymentController.handleWebhook
 );
 
+router.get(
+    API.PAYMENT.GET_PAYMENT_URL,
+    paymentController.getPaymentUrl
+);
+
 export default router;

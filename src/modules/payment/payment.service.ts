@@ -333,5 +333,35 @@ export const paymentService = {
         } catch (error) {
             console.error(`❌ Webhook Error forwarding to QStash:`, error);
         }
+    },
+
+    getPaymentUrl: async (appointmentId: string) => {
+        const payment = await prisma.appointment_payment.findUnique({
+            where: { appointment_id: appointmentId },
+        });
+
+        if (!payment || !payment.stripe_session_id) {
+            throw new Error("Payment record not found for this appointment.");
+        }
+
+        const session = await stripeService.getSessionDetails(payment.stripe_session_id);
+
+        if (session.payment_status === 'paid') {
+            throw new Error("Payment has already been completed for this appointment.");
+        }
+
+        if (session.status === 'expired') {
+            await prisma.appointment.update({
+                where: { id: appointmentId },
+                data: { status: 'PAYMENT_FAILED' },
+            });
+            throw new Error("Payment session has expired. Please try booking again.");
+        }
+
+        if (session.status === 'open') {
+            return session.url;
+        }
+
+        throw new Error(`Payment session is in state: ${session.status}`);
     }
 };

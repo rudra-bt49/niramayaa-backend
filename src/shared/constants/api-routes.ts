@@ -55,6 +55,7 @@ export const API = {
     },
     PAYMENT: {
         WEBHOOK: '/payments/webhook',
+        GET_PAYMENT_URL: '/appointment/:appointmentId/url',
     },
     RATING: {
         BASE: '/ratings',
