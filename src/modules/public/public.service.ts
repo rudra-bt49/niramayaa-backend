@@ -4,6 +4,8 @@ import { appointment_status } from "../../shared/constants/appointment-status";
 import { stripeService } from "../../shared/services/stripe.service";
 import { qstashService } from "../../shared/services/qstash.service";
 import { qrcodeService } from "../qrcode/qrcode.service";
+import { cloudinaryService } from "../../shared/services/cloudinary.service";
+import { aiService } from "../AI/summary-generator/ai.service";
 import Stripe from "stripe";
 
 export const publicService = {
@@ -99,7 +101,7 @@ export const publicService = {
         };
     },
 
-    createGuestCheckoutSession: async (doctorIdToken: string, body: any) => {
+    createGuestCheckoutSession: async (doctorIdToken: string, body: any, files?: Express.Multer.File[]) => {
         const doctorId = qrcodeService.decryptToken(doctorIdToken);
         const doctor = await prisma.doctor_profile.findUnique({
             where: { user_id: doctorId },
@@ -110,6 +112,64 @@ export const publicService = {
             throw { status: 404, message: 'Doctor not found or not eligible for walk-ins' };
         }
 
+        // 1. Process AI summary + Extract valid files
+        const patientDescription = body.description || body['description '] || ''; // Support Postman trailing space
+        console.log(`🔍 Guest Booking: Processing AI Summary for "${patientDescription}"`);
+        
+        const { ai_summary, validFiles } = await aiService.processDocuments(
+            files || [],
+            patientDescription
+        );
+
+        console.log(`✨ Guest Booking: AI Summary Generated: "${ai_summary}"`);
+
+        // 2. Upload valid files to Cloudinary
+        let reports = Array.isArray(body.reports) ? [...body.reports] : [];
+        if (validFiles.length > 0) {
+            console.log(`📤 Guest Booking: Uploading ${validFiles.length} valid reports...`);
+            const uploadPromises = validFiles.map(file => 
+                cloudinaryService.uploadImageStream(file.buffer, 'niramayaa/reports/guests')
+            );
+            const uploadedFiles = await Promise.all(uploadPromises);
+            reports = [...reports, ...uploadedFiles.map(f => ({ url: f.secure_url, public_id: f.public_id }))];
+        }
+
+        // 3. Create Appointment in PAYMENT_PENDING status
+        const pendingAppointment = await prisma.$transaction(async (tx) => {
+            const appt = await tx.appointment.create({
+                data: {
+                    doctor_id: doctorId,
+                    status: appointment_status.PAYMENT_PENDING as any,
+                    name: body.name || body['name '],
+                    email: body.email || body['email '],
+                    phone: `+91${(body.phone || body['phone '] || '').replace(/^\+91/, '')}`,
+                    gender: (body.gender || body['gender '] || 'OTHER').toUpperCase(),
+                    height: parseFloat(body.height || body['height '] || '0'),
+                    weight: parseFloat(body.weight || body['weight '] || '0'),
+                    blood_group: (body.blood_group || body['blood_group '] || 'O_POS').toUpperCase().replace(/\s+/g, '_'),
+                    description: patientDescription,
+                    ai_generated_summary: ai_summary && ai_summary.trim() !== "" ? ai_summary : "Medical summary being processed or unavailable.",
+                    // Temporary start_at for pending state
+                    start_at: new Date(),
+                    end_at: new Date(Date.now() + 20 * 60000),
+                } as any
+            });
+
+            if (reports.length > 0) {
+                await tx.medical_report.createMany({
+                    data: reports.map(r => ({
+                        appointment_id: appt.id,
+                        report_url: r.url,
+                        report_public_id: r.public_id,
+                    }))
+                });
+            }
+            return appt;
+        });
+        
+        console.log(`📝 Guest Booking: Created Pending Appointment: ${pendingAppointment.id}`);
+
+        // 4. Create Stripe Session
         const session = await stripeService.createAppointmentCheckoutSession({
             patientEmail: body.email,
             doctorName: `Dr. ${doctor.user.first_name} ${doctor.user.last_name}`,
@@ -118,16 +178,21 @@ export const publicService = {
             cancelUrl: `${process.env.CLIENT_URL}/appointments/cancel?session_id={CHECKOUT_SESSION_ID}`,
             metadata: {
                 registration_type: 'GUEST_WALKIN',
+                appointment_id: pendingAppointment.id,
                 doctor_id: doctorId,
-                name: body.name,
                 email: body.email,
-                phone: `+91${body.phone.replace(/^\+91/, '')}`,
-                gender: body.gender,
-                height: body.height.toString(),
-                weight: body.weight.toString(),
-                blood_group: body.blood_group,
-                description: body.description || '',
-                reports: JSON.stringify(body.reports || [])
+            }
+        });
+
+        // 5. Create Pending Payment Record
+        await prisma.appointment_payment.create({
+            data: {
+                appointment_id: pendingAppointment.id,
+                amount: doctor.consultation_fee,
+                currency: 'inr',
+                payment_method: 'card',
+                payment_status: 'pending',
+                stripe_session_id: session.id,
             }
         });
 
@@ -149,8 +214,7 @@ export const publicService = {
             return 'Ignored';
         }
 
-        const doctorId = metadata.doctor_id;
-        const reports = JSON.parse(metadata.reports || '[]');
+        const appointmentId = metadata.appointment_id;
 
         // Fetch receipt_url from Stripe
         let receipt_url: string | null = null;
@@ -171,10 +235,19 @@ export const publicService = {
             const startOfTodayUtc = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 0, 0, 0, 0) - istOffset);
             const endOfTodayUtc = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 23, 59, 59, 999) - istOffset);
 
-            // 1. Check/Update Availability
+            // 1. Fetch the Pending Appointment
+            const appt = await tx.appointment.findUnique({
+                where: { id: appointmentId }
+            });
+
+            if (!appt) {
+                throw new Error(`Appointment ${appointmentId} not found`);
+            }
+
+            // 2. Check/Update Availability
             const availability = await tx.availability.findFirst({
                 where: {
-                    doctor_id: doctorId,
+                    doctor_id: appt.doctor_id,
                     start_at: { gte: startOfTodayUtc, lte: endOfTodayUtc },
                     is_active: true
                 }
@@ -183,7 +256,7 @@ export const publicService = {
             // Calculate Dynamic Start Time first to check Time Boundary
             const lastAppt = await tx.appointment.findFirst({
                 where: {
-                    doctor_id: doctorId,
+                    doctor_id: appt.doctor_id,
                     start_at: { gte: startOfTodayUtc, lte: endOfTodayUtc },
                     status: { in: [appointment_status.SCHEDULED, appointment_status.COMPLETED] as any }
                 },
@@ -196,94 +269,59 @@ export const publicService = {
             const isTimeFull = availability ? new Date(startAt.getTime() + availability.slot_duration * 60000) > availability.end_at : true;
             const isCapacityFull = availability ? availability.current_queue_token >= availability.queue_capacity : true;
 
+            const updateData: any = {
+                appointment_payment: {
+                    update: {
+                        amount: (payload.amount || 0) / 100,
+                        payment_status: 'paid',
+                        receipt_url: receipt_url,
+                        stripe_session_id: session_id
+                    }
+                }
+            };
+
             if (!availability || isCapacityFull || isTimeFull) {
                 // If full (Time or Token), record as REFUND_REQUESTED
-                const appt = await tx.appointment.create({
+                const updatedAppt = await tx.appointment.update({
+                    where: { id: appointmentId },
                     data: {
-                        doctor_id: doctorId,
+                        ...updateData,
                         availability_id: availability?.id || null,
+                        status: appointment_status.REFUND_REQUESTED as any,
                         start_at: new Date(),
                         end_at: new Date(Date.now() + 20 * 60000),
-                        status: appointment_status.REFUND_REQUESTED as any,
-                        name: metadata.name,
-                        email: metadata.email,
-                        phone: metadata.phone,
-                        gender: metadata.gender as any,
-                        height: parseFloat(metadata.height),
-                        weight: parseFloat(metadata.weight),
-                        blood_group: metadata.blood_group as any,
-                        description: metadata.description,
-                        appointment_payment: {
-                            create: {
-                                amount: (payload.amount || 0) / 100,
-                                currency: 'inr',
-                                payment_method: 'card',
-                                payment_status: 'paid',
-                                receipt_url: receipt_url,
-                                stripe_session_id: session_id
-                            }
-                        }
-                    } as any
+                    }
                 });
-                return { appt, status: 'REFUND_REQUESTED' };
+                return { appt: updatedAppt, status: 'REFUND_REQUESTED' };
             }
 
-            // 2. Increment Token
+            // 3. Increment Token
             const nextToken = availability.current_queue_token + 1;
             await tx.availability.update({
                 where: { id: availability.id },
                 data: { current_queue_token: nextToken }
             });
 
-            // 3. Create Appointment and Payment
-            // Use 'startAt' calculated above in step 1
-            const appt = await tx.appointment.create({
+            // 4. Update Appointment to SCHEDULED
+            const finalizedAppt = await tx.appointment.update({
+                where: { id: appointmentId },
                 data: {
-                    doctor_id: doctorId,
+                    ...updateData,
                     availability_id: availability.id,
                     start_at: startAt,
                     end_at: new Date(startAt.getTime() + availability.slot_duration * 60000),
                     status: appointment_status.SCHEDULED as any,
-                    queue_token: nextToken,
-                    name: metadata.name,
-                    email: metadata.email,
-                    phone: metadata.phone,
-                    gender: metadata.gender as any,
-                    height: parseFloat(metadata.height),
-                    weight: parseFloat(metadata.weight),
-                    blood_group: metadata.blood_group as any,
-                    description: metadata.description,
-                    appointment_payment: {
-                        create: {
-                            amount: (payload.amount || 0) / 100,
-                            currency: 'inr',
-                            payment_method: 'card',
-                            payment_status: 'paid',
-                            receipt_url: receipt_url,
-                            stripe_session_id: session_id
-                        }
-                    }
-                } as any
+                    queue_token: nextToken
+                }
             });
 
-            // 4. Create Medical Reports if any
-            if (reports.length > 0) {
-                await tx.medical_report.createMany({
-                    data: reports.map((r: any) => ({
-                        appointment_id: appt.id,
-                        report_url: r.url,
-                        report_public_id: r.public_id
-                    }))
-                });
-            }
-
-            return { appt, status: 'SCHEDULED', token: nextToken };
+            return { appt: finalizedAppt, status: 'SCHEDULED', token: nextToken };
         });
 
         if (result.status === 'SCHEDULED') {
-            console.log(`🎊 Success: Appointment finalized for guest ${metadata.name}. Token: ${result.token}`);
+            console.log(`🎊 Success: Appointment finalized for guest ${result.appt.name}. Token: ${result.token}`);
         } else {
-            console.log(`⚠️ Full: Queue full for guest ${metadata.name}. Recorded as REFUND_REQUESTED.`);
+            console.log(`⚠️ Full: Queue full for guest ${result.appt.name}. Recorded as REFUND_REQUESTED.`);
         }
 
         return 'OK';
