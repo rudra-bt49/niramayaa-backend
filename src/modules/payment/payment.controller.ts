@@ -13,5 +13,11 @@ export const paymentController = {
 
         const result = await paymentService.handleWebhook((req as Request & { rawBody: Buffer }).rawBody, sig);
         res.status(200).json(result);
+    }),
+
+    getPaymentUrl: asyncHandler(async (req: Request, res: Response) => {
+        const { appointmentId } = req.params;
+        const checkoutUrl = await paymentService.getPaymentUrl(appointmentId as string);
+        res.status(200).json({ success: true, message: 'Payment URL fetched', data: { url: checkoutUrl } });
     })
 };
