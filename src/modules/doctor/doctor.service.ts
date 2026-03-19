@@ -282,17 +282,29 @@ export const doctorService = {
         const skip = (pageNum - 1) * limitNum;
         const now = new Date();
  
-        // 0. Just-in-time: Update past scheduled appointments to COMPLETED (only if end_at has passed)
-        await prisma.appointment.updateMany({
-            where: {
-                doctor_id: doctorId,
-                status: appointment_status.SCHEDULED,
-                end_at: { lt: now }
-            },
-            data: {
-                status: appointment_status.COMPLETED
-            }
-        });
+        // 0. Just-in-time: Update past scheduled appointments to COMPLETED and pending to FAILED
+        await prisma.$transaction([
+            prisma.appointment.updateMany({
+                where: {
+                    doctor_id: doctorId,
+                    status: appointment_status.SCHEDULED,
+                    end_at: { lt: now }
+                },
+                data: {
+                    status: appointment_status.COMPLETED
+                }
+            }),
+            prisma.appointment.updateMany({
+                where: {
+                    doctor_id: doctorId,
+                    status: appointment_status.PAYMENT_PENDING,
+                    end_at: { lt: now }
+                },
+                data: {
+                    status: appointment_status.PAYMENT_FAILED
+                }
+            })
+        ]);
  
         // 1. Build where clause based on tab
         const where: Prisma.appointmentWhereInput = {
@@ -318,11 +330,29 @@ export const doctorService = {
             where.status = appointment_status.SCHEDULED;
             where.start_at = { gt: now, ...((where.start_at as any) || {}) };
         } else if (tab === doctor_appointment_tabs.HISTORY) {
-            const historyStatuses = status && status.length > 0
+            const historyStatuses = (status && status.length > 0
                 ? status
-                : [appointment_status.COMPLETED, appointment_status.PAYMENT_FAILED, appointment_status.REFUND_REQUESTED];
- 
-            where.status = { in: historyStatuses as any };
+                : [appointment_status.COMPLETED, appointment_status.PAYMENT_FAILED, appointment_status.REFUND_REQUESTED]) as any[];
+
+            if (!from && !to) {
+                const orConditions = [];
+                if (historyStatuses.includes(appointment_status.COMPLETED)) {
+                    orConditions.push({ status: appointment_status.COMPLETED, start_at: { lt: now } });
+                }
+                if (historyStatuses.includes(appointment_status.PAYMENT_FAILED)) {
+                    orConditions.push({ status: appointment_status.PAYMENT_FAILED });
+                }
+                if (historyStatuses.includes(appointment_status.REFUND_REQUESTED)) {
+                    orConditions.push({ status: appointment_status.REFUND_REQUESTED });
+                }
+                
+                if (orConditions.length > 0) {
+                    delete (where as any).status;
+                    where.OR = orConditions;
+                }
+            } else {
+                where.status = { in: historyStatuses as any };
+            }
         }
  
         // 2. Sorting logic

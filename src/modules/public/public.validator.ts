@@ -4,9 +4,12 @@ import { REGEX } from '../../shared/constants/regex.constants';
 
 export const guestBookingSchema = z.object({
     body: z.object({
-        name: z.string()
-            .min(2, "Name must be at least 2 characters")
-            .regex(REGEX.NAME, "Only alphabets are allowed in name"),
+        first_name: z.string()
+            .min(2, "First name must be at least 2 characters")
+            .regex(REGEX.NAME, "Only alphabets are allowed in first name"),
+        last_name: z.string()
+            .min(2, "Last name must be at least 2 characters")
+            .regex(REGEX.NAME, "Only alphabets are allowed in last name"),
         email: z.string().regex(REGEX.EMAIL, "Invalid email format"),
         phone: z.string().regex(REGEX.PHONE, "Invalid 10-digit Indian phone number"),
         gender: z.preprocess(
