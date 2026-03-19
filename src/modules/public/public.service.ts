@@ -140,7 +140,7 @@ export const publicService = {
                 data: {
                     doctor_id: doctorId,
                     status: appointment_status.PAYMENT_PENDING as any,
-                    name: body.name || body['name '],
+                    name: `${(body.first_name || body['first_name '] || '').trim()} ${(body.last_name || body['last_name '] || '').trim()}`.trim(),
                     email: body.email || body['email '],
                     phone: `+91${(body.phone || body['phone '] || '').replace(/^\+91/, '')}`,
                     gender: (body.gender || body['gender '] || 'OTHER').toUpperCase(),
