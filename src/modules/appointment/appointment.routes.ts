@@ -35,7 +35,6 @@ router.post(
 
 router.get(
     API.APPOINTMENT.GET_APPOINTMENT_STATUS,
-    authMiddleware([UserRole.PATIENT]),
     appointmentController.getAppointmentStatus
 );
 

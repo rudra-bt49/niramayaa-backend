@@ -247,23 +247,34 @@ export const appointmentService = {
 
         const doctor = payment.appointment.doctor.user;
 
-        // Proactively fetch receipt_url if missing
+        // Proactively fetch receipt_url if missing or if payment is still 'pending' locally
         let receiptUrl = payment.receipt_url;
-        if (!receiptUrl && payment.payment_status === 'paid') {
+        let paymentStatus = payment.payment_status;
+
+        if (!receiptUrl || paymentStatus === 'pending') {
             try {
                 const expandedSession = await stripeService.getSessionDetails(sessionId);
                 const paymentIntent = expandedSession.payment_intent as Stripe.PaymentIntent;
-                receiptUrl = paymentIntent?.latest_charge ? (paymentIntent.latest_charge as any).receipt_url : null;
                 
-                if (receiptUrl) {
-                    await prisma.appointment_payment.update({
-                        where: { id: payment.id },
-                        data: { receipt_url: receiptUrl }
-                    });
-                    console.log(`✨ Proactively updated receipt_url for session ${sessionId}`);
+                // If Stripe says it's paid but we have it as pending, or we just need the receipt
+                if (expandedSession.payment_status === 'paid' || expandedSession.status === 'complete') {
+                    receiptUrl = paymentIntent?.latest_charge ? (paymentIntent.latest_charge as any).receipt_url : receiptUrl;
+                    paymentStatus = 'paid';
+
+                    // Update DB if we found new info
+                    if (receiptUrl !== payment.receipt_url || paymentStatus !== payment.payment_status) {
+                        await prisma.appointment_payment.update({
+                            where: { id: payment.id },
+                            data: { 
+                                receipt_url: receiptUrl,
+                                payment_status: paymentStatus
+                            }
+                        });
+                        console.log(`✨ Proactively updated payment info for session ${sessionId}`);
+                    }
                 }
             } catch (err) {
-                console.warn(`⚠️ Warning: Failed to proactively fetch receipt_url for session ${sessionId}`, err);
+                console.warn(`⚠️ Warning: Failed to proactively fetch info from Stripe for session ${sessionId}`, err);
             }
         }
 
@@ -275,7 +286,7 @@ export const appointmentService = {
             payment: {
                 amount: payment.amount,
                 currency: payment.currency,
-                payment_status: payment.payment_status,
+                payment_status: paymentStatus,
                 receipt_url: receiptUrl,
                 payment_method: payment.payment_method
             }
