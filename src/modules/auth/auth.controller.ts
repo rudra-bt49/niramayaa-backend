@@ -18,19 +18,26 @@ const getDeviceInfo = (req: Request) => {
     return { deviceId, deviceName };
 };
 
+const getCookieOptions = (req: Request) => {
+    const origin = req.headers.origin || req.headers.referer || '';
+    const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+    const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true' || !isLocalhost;
+    return {
+        httpOnly: true,
+        secure: isSecure,
+        sameSite: isSecure ? 'none' as const : 'lax' as const,
+        path: '/',
+    };
+};
+
 export const authController = {
     signupPatient: asyncHandler(async (req: Request, res: Response) => {
         const { deviceId, deviceName } = getDeviceInfo(req);
         const result = await authService.patientSignup(req.body, deviceId, deviceName);
 
-        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
-
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
-            httpOnly: true,
-            secure: isSecure,
-            sameSite: isSecure ? 'none' : 'lax',
-            path: '/',
+            ...getCookieOptions(req),
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -64,14 +71,9 @@ export const authController = {
         const { deviceId, deviceName } = getDeviceInfo(req);
         const result = await authService.login(req.body, deviceId, deviceName);
 
-        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
-
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
-            httpOnly: true,
-            secure: isSecure,
-            sameSite: isSecure ? 'none' : 'lax',
-            path: '/',
+            ...getCookieOptions(req),
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -104,14 +106,9 @@ export const authController = {
         const { deviceId, deviceName } = getDeviceInfo(req);
         const result = await authService.verifyDoctorPaymentSession(session_id, deviceId, deviceName);
 
-        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
-
         // Set refresh token in HTTP-only cookie
         res.cookie('refreshToken', result.refreshToken, {
-            httpOnly: true,
-            secure: isSecure,
-            sameSite: isSecure ? 'none' : 'lax',
-            path: '/',
+            ...getCookieOptions(req),
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -239,15 +236,8 @@ export const authController = {
 
         await authService.logout(userId, refreshToken);
 
-        const isSecure = process.env.NODE_ENV === 'production' || process.env.SECURE_COOKIES === 'true';
-
         // Clear the refresh token cookie on the client side
-        res.clearCookie('refreshToken', {
-            httpOnly: true,
-            secure: isSecure,
-            sameSite: isSecure ? 'none' : 'lax',
-            path: '/'
-        });
+        res.clearCookie('refreshToken', getCookieOptions(req));
 
         res.status(200).json(
             ApiResponse.success(
