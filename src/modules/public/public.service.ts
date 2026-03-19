@@ -6,6 +6,7 @@ import { qstashService } from "../../shared/services/qstash.service";
 import { qrcodeService } from "../qrcode/qrcode.service";
 import { cloudinaryService } from "../../shared/services/cloudinary.service";
 import { aiService } from "../AI/summary-generator/ai.service";
+import emailService from "../../shared/services/email.service";
 import Stripe from "stripe";
 
 export const publicService = {
@@ -320,6 +321,50 @@ export const publicService = {
 
         if (result.status === 'SCHEDULED') {
             console.log(`🎊 Success: Appointment finalized for guest ${result.appt.name}. Token: ${result.token}`);
+            
+            // Send Email Notifications
+            try {
+                const fullAppt = await prisma.appointment.findUnique({
+                    where: { id: result.appt.id },
+                    include: {
+                        doctor: {
+                            include: {
+                                user: {
+                                    select: { first_name: true, last_name: true, email: true }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if (fullAppt && result.token !== undefined) {
+                    const doctorName = `Dr. ${fullAppt.doctor.user.first_name} ${fullAppt.doctor.user.last_name}`;
+                    const tokenNumber = result.token;
+
+                    // 1. Send to Guest Patient
+                    await emailService.sendQrAppointmentConfirmationToPatient(fullAppt.email, {
+                        patientName: fullAppt.name,
+                        doctorName,
+                        tokenNumber,
+                        amount: (payload.amount || 0) / 100,
+                        receiptUrl: receipt_url
+                    });
+
+                    // 2. Send to Doctor
+                    await emailService.sendQrAppointmentNotificationToDoctor(fullAppt.doctor.user.email, {
+                        doctorName,
+                        patientName: fullAppt.name,
+                        patientEmail: fullAppt.email,
+                        patientPhone: fullAppt.phone,
+                        tokenNumber,
+                        description: fullAppt.description
+                    });
+
+                    console.log(`✅ Webhook: Guest booking emails sent successfully for token #${tokenNumber}`);
+                }
+            } catch (emailErr) {
+                console.error("⚠️ Webhook: Failed to send guest booking emails", emailErr);
+            }
         } else {
             console.log(`⚠️ Full: Queue full for guest ${result.appt.name}. Recorded as REFUND_REQUESTED.`);
         }
