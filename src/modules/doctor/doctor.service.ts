@@ -462,7 +462,7 @@ export const doctorService = {
             pagination: {
                 total_items: totalAppointments,
                 total_pages: totalPages,
-                current_page: page,
+                current_page: pageNum,
                 limit
             }
         };

@@ -4,6 +4,7 @@ import { doctorService } from './doctor.service';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { ApiResponse } from '../../shared/utils/ApiResponse';
 import { IUpdateDoctorProfileRequest } from './doctor.profile.types';
+import { getAppointmentsQuerySchema } from './doctor.validator';
 
 export const doctorController = {
     getProfile: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -51,7 +52,7 @@ export const doctorController = {
             return;
         }
 
-        const query = req.query as any;
+        const { query } = getAppointmentsQuerySchema.parse({ query: req.query });
         const result = await doctorService.getAppointments(userId, query);
 
         res.status(200).json(ApiResponse.success(result, 'Appointments fetched successfully'));
