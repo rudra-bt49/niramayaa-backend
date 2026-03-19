@@ -11,6 +11,7 @@ import { API } from "./shared/constants/api-routes";
 const app = express();
 
 // Security
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cookieParser());
 app.use(useragent.express());
