@@ -68,4 +68,20 @@ export const AgentState = Annotation.Root({
         reducer: (x, y) => y ?? x,
         default: () => undefined,
     }),
+    newly_extracted_fields: Annotation<string[]>({
+        reducer: (x, y) => y || [],
+        default: () => [],
+    }),
+    updated_fields: Annotation<string[]>({
+        reducer: (x, y) => y || [],
+        default: () => [],
+    }),
+    is_confirmed: Annotation<boolean>({
+        reducer: (x, y) => y ?? x,
+        default: () => false,
+    }),
+    details_shown: Annotation<boolean>({
+        reducer: (x, y) => y ?? x,
+        default: () => false,
+    }),
 });
