@@ -30,6 +30,7 @@ export const authController = {
             httpOnly: true,
             secure: isSecure,
             sameSite: isSecure ? 'none' : 'lax',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -70,6 +71,7 @@ export const authController = {
             httpOnly: true,
             secure: isSecure,
             sameSite: isSecure ? 'none' : 'lax',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -109,6 +111,7 @@ export const authController = {
             httpOnly: true,
             secure: isSecure,
             sameSite: isSecure ? 'none' : 'lax',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
