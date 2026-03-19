@@ -2,7 +2,7 @@ import prisma from '../../prisma/prisma';
 import bcrypt from 'bcrypt';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
 import { IUpdateDoctorProfileRequest, IUpdateDoctorProfileResponse } from './doctor.profile.types';
-import { convertUtcToIstDate, convertISTToUTC, convertIstToUtc } from '../../shared/utils/timezone';
+import { convertUtcToIstDate, convertISTToUTC, convertIstToUtc, calculateAge } from '../../shared/utils/timezone';
 import { IGetDoctorAppointmentsQuery } from './doctor.validator';
 import { appointment_status } from '../../shared/constants/appointment-status';
 import { doctor_appointment_tabs } from '../../shared/constants/appointment-tabs';
@@ -42,6 +42,17 @@ export const doctorService = {
             const error: any = new Error("User not found");
             error.statusCode = 404;
             throw error;
+        }
+
+        // 1.5. Validate Experience vs Age
+        if (data.experience !== undefined && user.dob) {
+            const age = calculateAge(user.dob);
+            const maxExp = Math.max(0, age - 22);
+            if (data.experience > maxExp) {
+                const error: any = new Error(`Experience cannot exceed ${maxExp} years for your age`);
+                error.statusCode = 400;
+                throw error;
+            }
         }
  
         // 2. Handle Password Change

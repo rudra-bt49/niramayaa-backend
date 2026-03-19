@@ -94,6 +94,13 @@ export const doctorSignupSchema = z.object({
         plan_name: z.enum(["ELITE", "PRO"], { message: "Invalid plan name" }),
         verification_token: z.string().min(1, "Verification token is required"),
     }),
+}).refine((data) => {
+    const age = calculateAge(data.body.dob);
+    const maxExp = Math.max(0, age - 22);
+    return data.body.experience <= maxExp;
+}, {
+    message: "Experience cannot exceed (age - 22) years",
+    path: ["body", "experience"],
 });
 
 export const forgotPasswordSchema = z.object({
