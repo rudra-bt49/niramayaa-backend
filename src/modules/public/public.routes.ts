@@ -9,7 +9,7 @@ import { API } from '../../shared/constants/api-routes';
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10 MB limit per file
+        fileSize: 5 * 1024 * 1024, // 5 MB limit per file
     },
     fileFilter: (req, file, cb) => {
         const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
