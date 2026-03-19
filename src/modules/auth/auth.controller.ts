@@ -147,7 +147,12 @@ export const authController = {
     }),
 
     validateSession: asyncHandler(async (req: Request, res: Response) => {
-        // If authMiddleware passed, the session is valid
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            res.status(401).json(ApiResponse.error("Session expired or missing. Please Login", 401));
+            return;
+        }
+        await authService.validateSession(refreshToken);
         res.status(200).json(
             ApiResponse.success(
                 null,
@@ -155,6 +160,52 @@ export const authController = {
                 200
             )
         );
+    }),
+
+    validateSessionStream: asyncHandler(async (req: Request, res: Response) => {
+        // Setup SSE Event Stream
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // Disable Nginx or reverse proxy buffering (if any)
+        res.setHeader('X-Accel-Buffering', 'no');
+
+        // Allow immediate responses
+        res.flushHeaders?.();
+
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            res.write(`data: ${JSON.stringify({ status: 401, message: "Session missing." })}\n\n`);
+            res.end();
+            return;
+        }
+
+        // Send an initial connected heartbeat
+        res.write(`data: ${JSON.stringify({ status: 200, message: "Connected" })}\n\n`);
+        (res as any).flush?.();
+
+        // Check the database every 3 seconds for session validity
+        const intervalId = setInterval(async () => {
+            try {
+                await authService.validateSession(refreshToken);
+                // Send heartbeat to ensure stream stays alive
+                res.write(`data: ${JSON.stringify({ status: 200, message: "Ping" })}\n\n`);
+                (res as any).flush?.();
+            } catch (error) {
+                // If the session is invalid, notify the client and terminate connection
+                res.write(`data: ${JSON.stringify({ status: 401, message: "Session expired or force-logged out." })}\n\n`);
+                (res as any).flush?.();
+                clearInterval(intervalId);
+                res.end();
+            }
+        }, 3000);
+
+        // Clean up when the client closes the connection
+        req.on('close', () => {
+            clearInterval(intervalId);
+            res.end();
+        });
     }),
 
     refreshToken: asyncHandler(async (req: Request, res: Response) => {

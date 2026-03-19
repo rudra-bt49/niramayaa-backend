@@ -3,6 +3,7 @@ export const API = {
         LOGIN: '/auth/login',
         REFRESH: '/auth/refresh',
         VALIDATE_SESSION: '/auth/validate',
+        VALIDATE_SESSION_STREAM: '/auth/validate-stream',
         RESET_PASSWORD: '/auth/reset-password',
         FORGOT_PASSWORD: '/auth/forgot-password',
         SEND_OTP: '/send-verification-otp',
