@@ -519,9 +519,12 @@ export const doctorService = {
  
         if (fromStr && toStr) {
             fromDate = convertIstToUtc(fromStr);
-            fromDate.setHours(0, 0, 0, 0);
+            // already at IST 00:00:00
             toDate = convertIstToUtc(toStr);
-            toDate.setHours(23, 59, 59, 999);
+            // Move to end of day in IST (23:59:59.999)
+            // convertIstToUtc for date-only gives IST 00:00 (which is 18:30 UTC previous day)
+            // So we add 24 hours minus 1ms
+            toDate.setTime(toDate.getTime() + (24 * 60 * 60 * 1000) - 1);
         } else {
             toDate = new Date(istTodayEnd);
             fromDate = new Date(istTodayStart);
@@ -550,8 +553,7 @@ export const doctorService = {
         // Initialize daily stats within the range
         const dailyStats: Record<string, { appointments: number, revenue: number }> = {};
         for (let i = 0; i < daysInRange; i++) {
-            const d = new Date(fromDate);
-            d.setDate(d.getDate() + i);
+            const d = new Date(fromDate.getTime() + (i * 24 * 60 * 60 * 1000));
             const istD = convertUtcToIstDate(d);
             if (!istD) continue;
             const dateStr = istD.toISOString().split('T')[0];
