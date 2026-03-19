@@ -30,6 +30,10 @@ export const paymentService = {
                 await paymentService.handleAppointmentSession(event.data.object as Stripe.Checkout.Session, 'SUCCESS');
                 await paymentService.handleGuestWalkinSession(event.data.object as Stripe.Checkout.Session);
                 break;
+            case 'charge.succeeded':
+                console.log("Processing charge.succeeded...");
+                await paymentService.handleChargeSucceeded(event.data.object as Stripe.Charge);
+                break;
             case 'checkout.session.expired':
                 console.log(`⚠️ Webhook: Session ${event.data.object.id} expired. Handling as failure if applicable.`);
                 await paymentService.handleAppointmentSession(event.data.object as Stripe.Checkout.Session, 'FAILURE');
@@ -363,5 +367,26 @@ export const paymentService = {
         }
 
         throw new Error(`Payment session is in state: ${session.status}`);
+    },
+
+    handleChargeSucceeded: async (charge: Stripe.Charge) => {
+        const receiptUrl = charge.receipt_url;
+        if (!receiptUrl) return;
+
+        console.log(`🚀 Webhook: Handling charge.succeeded for charge ${charge.id}...`);
+
+        try {
+            const checkoutSessionId = charge.metadata?.checkout_session_id;
+
+            if (checkoutSessionId) {
+                await prisma.appointment_payment.updateMany({
+                    where: { stripe_session_id: checkoutSessionId, receipt_url: null },
+                    data: { receipt_url: receiptUrl }
+                });
+                console.log(`✅ Webhook: Updated receipt_url for session ${checkoutSessionId} via charge.succeeded`);
+            }
+        } catch (err) {
+            console.error("❌ Webhook: Error in handleChargeSucceeded:", err);
+        }
     }
 };

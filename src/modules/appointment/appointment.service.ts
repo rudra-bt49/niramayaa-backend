@@ -1,4 +1,5 @@
 import prisma from '../../prisma/prisma';
+import Stripe from 'stripe';
 import { BookAppointmentReqBody } from './appointment.types';
 import { stripeService } from '../../shared/services/stripe.service';
 import { cloudinaryService } from '../../shared/services/cloudinary.service';
@@ -246,6 +247,26 @@ export const appointmentService = {
 
         const doctor = payment.appointment.doctor.user;
 
+        // Proactively fetch receipt_url if missing
+        let receiptUrl = payment.receipt_url;
+        if (!receiptUrl && payment.payment_status === 'paid') {
+            try {
+                const expandedSession = await stripeService.getSessionDetails(sessionId);
+                const paymentIntent = expandedSession.payment_intent as Stripe.PaymentIntent;
+                receiptUrl = paymentIntent?.latest_charge ? (paymentIntent.latest_charge as any).receipt_url : null;
+                
+                if (receiptUrl) {
+                    await prisma.appointment_payment.update({
+                        where: { id: payment.id },
+                        data: { receipt_url: receiptUrl }
+                    });
+                    console.log(`✨ Proactively updated receipt_url for session ${sessionId}`);
+                }
+            } catch (err) {
+                console.warn(`⚠️ Warning: Failed to proactively fetch receipt_url for session ${sessionId}`, err);
+            }
+        }
+
         return {
             appointment: {
                 ...payment.appointment,
@@ -255,7 +276,7 @@ export const appointmentService = {
                 amount: payment.amount,
                 currency: payment.currency,
                 payment_status: payment.payment_status,
-                receipt_url: payment.receipt_url,
+                receipt_url: receiptUrl,
                 payment_method: payment.payment_method
             }
         };

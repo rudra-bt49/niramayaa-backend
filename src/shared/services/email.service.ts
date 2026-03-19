@@ -153,6 +153,28 @@ class EmailService {
     });
   }
 
+  /**
+   * Send QR Appointment Confirmation to Guest Patient
+   */
+  public async sendQrAppointmentConfirmationToPatient(
+    email: string,
+    params: Parameters<typeof EmailTemplates.qrAppointmentConfirmationPatient>[0]
+  ): Promise<boolean> {
+    const { subject, html, text } = EmailTemplates.qrAppointmentConfirmationPatient(params);
+    return await this.sendEmail({ to: email, subject, html, text });
+  }
+
+  /**
+   * Send QR Appointment Notification to Doctor
+   */
+  public async sendQrAppointmentNotificationToDoctor(
+    email: string,
+    params: Parameters<typeof EmailTemplates.qrAppointmentNotificationDoctor>[0]
+  ): Promise<boolean> {
+    const { subject, html, text } = EmailTemplates.qrAppointmentNotificationDoctor(params);
+    return await this.sendEmail({ to: email, subject, html, text });
+  }
+
 }
 
 export default new EmailService();

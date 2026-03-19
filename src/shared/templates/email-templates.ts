@@ -361,6 +361,154 @@ export const EmailTemplates = {
 
         const html = renderPrescriptionHtml(patientName, heading, introText, items);
         return { subject, html, text };
+    },
+
+    /**
+     * QR Appointment Confirmation — sent to the GUEST PATIENT after successful QR booking
+     */
+    qrAppointmentConfirmationPatient: (params: {
+        patientName: string;
+        doctorName: string;
+        tokenNumber: number;
+        amount: number;
+        receiptUrl: string | null;
+    }) => {
+        const subject = `Booking Confirmed - Token #${params.tokenNumber} - Niramayaa`;
+        const text = `Hi ${params.patientName}, your booking with Dr. ${params.doctorName} is confirmed. Your token number is ${params.tokenNumber}.`;
+        const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; }
+          .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+          .content { padding: 30px; line-height: 1.6; color: #1e293b; background-color: #ffffff; }
+          .token-box { background: linear-gradient(135deg, #f8faff 0%, #eef2ff 100%); border: 2px solid #6366f1; padding: 25px; border-radius: 15px; text-align: center; margin: 20px 0; }
+          .token-label { font-size: 0.8rem; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px; }
+          .token-number { font-size: 3.5rem; font-weight: 900; color: #4f46e5; margin: 0; line-height: 1; }
+          .info-box { background-color: #f8fafc; border: 1px solid #f1f5f9; padding: 20px; border-radius: 10px; margin-bottom: 16px; }
+          .info-row { padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+          .info-row:last-child { border-bottom: none; }
+          .label { color: #64748b; font-weight: 600; font-size: 0.85rem; }
+          .value { color: #1e293b; font-weight: 700; float: right; }
+          .button { display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white !important; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 15px; }
+          .footer { text-align: center; font-size: 0.75rem; color: #64748b; margin-top: 20px; padding: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">Booking Confirmed</h1>
+            <p style="margin:10px 0 0 0; opacity: 0.9;">Walk-in Appointment</p>
+          </div>
+          <div class="content">
+            <p>Hi <strong>${params.patientName}</strong>,</p>
+            <p>Your walk-in appointment has been confirmed. Please show this token number at the reception when you arrive.</p>
+
+            <div class="token-box">
+              <div class="token-label">Your Queue Token</div>
+              <div class="token-number">#${params.tokenNumber}</div>
+            </div>
+
+            <div class="info-box">
+              <div class="info-row">
+                <span class="label">Doctor</span>
+                <span class="value">Dr. ${params.doctorName}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Amount Paid</span>
+                <span class="value">₹${params.amount}</span>
+              </div>
+              <div class="info-row" style="clear: both; border-bottom: none; padding-bottom: 0;"></div>
+            </div>
+
+            ${params.receiptUrl ? `
+            <div style="text-align: center;">
+              <a href="${params.receiptUrl}" class="button">View Payment Receipt</a>
+            </div>
+            ` : ''}
+
+            <p style="margin-top: 24px; font-size: 0.9rem; color: #64748b; text-align: center;">
+              Thank you for choosing Niramayaa Healthcare.
+            </p>
+            <p>Best regards,<br /><strong>The Niramayaa Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 Niramayaa Healthcare. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+        return { subject, html, text };
+    },
+
+    /**
+     * QR Appointment Notification — sent to the DOCTOR for a new QR guest booking
+     */
+    qrAppointmentNotificationDoctor: (params: {
+        doctorName: string;
+        patientName: string;
+        patientEmail: string;
+        patientPhone: string;
+        tokenNumber: number;
+        description: string;
+    }) => {
+        const subject = `New Walk-in: Token #${params.tokenNumber} - ${params.patientName}`;
+        const text = `Hi Dr. ${params.doctorName}, a new walk-in appointment has been booked by ${params.patientName}. Token: ${params.tokenNumber}.`;
+        const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+          .content { padding: 30px; line-height: 1.6; color: #1e293b; background-color: #ffffff; }
+          .token-badge { background-color: #10b981; color: white; padding: 5px 15px; border-radius: 999px; font-weight: bold; font-size: 1.1rem; }
+          .section-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #059669; margin: 25px 0 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 5px; }
+          .info-box { background-color: #f8fafc; border: 1px solid #f1f5f9; padding: 18px; border-radius: 10px; margin-bottom: 16px; }
+          .info-row { padding: 6px 0; }
+          .label { color: #64748b; font-weight: 600; font-size: 0.85rem; width: 100px; display: inline-block; }
+          .value { color: #1e293b; font-weight: 700; }
+          .description-box { background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; border-radius: 0 8px 8px 0; margin-top: 10px; font-style: italic; color: #065f46; }
+          .footer { text-align: center; font-size: 0.75rem; color: #64748b; margin-top: 20px; padding: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">New Walk-in Patient</h1>
+            <p style="margin:10px 0 0 0; opacity: 0.9;">Guest booked via QR code</p>
+          </div>
+          <div class="content">
+            <div style="text-align: right; margin-bottom: 20px;">
+                <span class="token-badge">Token #${params.tokenNumber}</span>
+            </div>
+            
+            <p>Hi <strong>Dr. ${params.doctorName}</strong>,</p>
+            <p>A new guest has booked a walk-in appointment. They are currently in the queue.</p>
+
+            <p class="section-title">Patient Contact</p>
+            <div class="info-box">
+              <div class="info-row"><span class="label">Name:</span> <span class="value">${params.patientName}</span></div>
+              <div class="info-row"><span class="label">Email:</span> <span class="value">${params.patientEmail}</span></div>
+              <div class="info-row"><span class="label">Phone:</span> <span class="value">${params.patientPhone}</span></div>
+            </div>
+
+            <p class="section-title">Issue / Description</p>
+            <div class="description-box">${params.description}</div>
+
+            <p style="margin-top: 24px;">This patient has been added to your live queue. Please review their details in your dashboard.</p>
+            <p>Best regards,<br /><strong>The Niramayaa Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 Niramayaa Healthcare. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+        return { subject, html, text };
     }
 };
 
