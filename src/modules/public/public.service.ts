@@ -7,6 +7,7 @@ import { qrcodeService } from "../qrcode/qrcode.service";
 import { cloudinaryService } from "../../shared/services/cloudinary.service";
 import { aiService } from "../AI/summary-generator/ai.service";
 import emailService from "../../shared/services/email.service";
+import { QueueFullReason } from "../../shared/constants/queue-full-reason";
 import Stripe from "stripe";
 
 export const publicService = {
@@ -78,12 +79,15 @@ export const publicService = {
         const isTimeFull = new Date(nextStartTime.getTime() + availability.slot_duration * 60000) > availability.end_at;
         const isCapacityFull = availability.current_queue_token >= availability.queue_capacity;
         const isFull = isCapacityFull || isTimeFull;
+        
+        const fullReason = isTimeFull ? QueueFullReason.SHIFT_ENDED : (isCapacityFull ? QueueFullReason.CAPACITY_REACHED : undefined);
 
         const estWaitTime = Math.max(0, Math.round((nextStartTime.getTime() - now.getTime()) / 60000));
 
         return {
             is_open: true,
             is_full: isFull,
+            full_reason: fullReason,
             doctor_name: `Dr. ${doctor.user.first_name} ${doctor.user.last_name}`,
             doctor_image: doctor.user.profile_image,
             doctor_email: doctor.user.email,
