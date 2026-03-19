@@ -92,7 +92,7 @@ export const appointmentService = {
 
         let warning: string | undefined;
         if (patientOverlap) {
-            warning = "Warning: You already have an appointment booked for this time slot. You can still proceed with this booking if you wish.";
+            warning = "Warning: You already have an appointment booked for this time slot for another doctor. You can still proceed with this booking if you wish.";
         }
 
         // 8. Process AI summary + upload valid medical reports to Cloudinary
@@ -399,5 +399,27 @@ export const appointmentService = {
         });
 
         return { success: true, message: 'Medical reports and AI summary updated successfully' };
-    }
+    },
+
+    checkPatientOverlap: async (userId: string, startAt: string, endAt: string) => {
+        const startAtUtc = convertIstToUtc(startAt);
+        const endAtUtc = convertIstToUtc(endAt);
+
+        const patientOverlap = await prisma.appointment.findFirst({
+            where: {
+                patient_id: userId,
+                status: AppointmentStatus.SCHEDULED,
+                start_at: { lt: endAtUtc },
+                end_at: { gt: startAtUtc }
+            }
+        });
+
+        if (patientOverlap) {
+            return { 
+                overlap: true, 
+                message: "Warning: You already have an appointment booked for this time slot with another doctor. You can still proceed with this booking if you wish." 
+            };
+        }
+        return { overlap: false };
+    },
 };
