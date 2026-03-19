@@ -35,7 +35,7 @@ export const AgentState = Annotation.Root({
         default: () => ({} as BookingContext),
     }),
     collected_data: Annotation<Partial<ExtractedPatientDetails>>({
-        reducer: (state, update) => ({ ...state, ...(update || {}) }), 
+        reducer: (state, update) => ({ ...state, ...(update || {}) }),
         default: () => ({}),
     }),
     missing_fields: Annotation<string[]>({
@@ -45,17 +45,15 @@ export const AgentState = Annotation.Root({
     files: Annotation<Express.Multer.File[]>({
         reducer: (existingFiles, newFiles) => {
             const combinedFiles = [...existingFiles, ...(newFiles || [])];
-            
+
             // Deduplicate based on the file's original name
             const uniqueFilesMap = new Map();
             combinedFiles.forEach(file => {
-                // If we haven't seen this file name yet, add it to the map
                 if (!uniqueFilesMap.has(file.originalname)) {
                     uniqueFilesMap.set(file.originalname, file);
                 }
             });
-            
-            // Convert the map values back to an array
+
             return Array.from(uniqueFilesMap.values());
         },
         default: () => [],
@@ -83,5 +81,23 @@ export const AgentState = Annotation.Root({
     details_shown: Annotation<boolean>({
         reducer: (x, y) => y ?? x,
         default: () => false,
+    }),
+    /**
+     * Tracks the last field the assistant asked for.
+     * Used to give the extraction LLM context so bare numbers ("178", "65")
+     * are correctly attributed to height/weight without requiring units.
+     */
+    last_asked_field: Annotation<string | undefined>({
+        reducer: (x, y) => y ?? x,
+        default: () => undefined,
+    }),
+    /**
+     * Fields extracted this turn that failed range validation.
+     * Key = field name, value = the bad value the user provided.
+     * e.g. { height: 1700 } means user said 1700 cm which is out of range.
+     */
+    invalid_fields: Annotation<Record<string, number>>({
+        reducer: (_, y) => y ?? {},
+        default: () => ({}),
     }),
 });
