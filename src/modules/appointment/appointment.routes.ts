@@ -40,6 +40,7 @@ router.get(
 );
 
 router.post(API.APPOINTMENT.CANCEL_APPOINTMENT, authMiddleware([UserRole.PATIENT]), appointmentController.handleCancel);
+router.post(API.APPOINTMENT.CHECK_OVERLAP, authMiddleware([UserRole.PATIENT]), appointmentController.checkOverlap);
 
 router.patch(
     API.APPOINTMENT.EDIT_REPORTS,

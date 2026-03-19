@@ -93,4 +93,21 @@ export const appointmentController = {
 
         res.status(200).json(result);
     }),
+
+    checkOverlap: asyncHandler(async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const { start_at, end_at } = req.body;
+        if (!start_at || !end_at) {
+            res.status(400).json({ success: false, message: 'start_at and end_at are required' });
+            return;
+        }
+
+        const result = await appointmentService.checkPatientOverlap(userId, start_at, end_at);
+        res.status(200).json({ success: true, data: result });
+    }),
 };

@@ -49,6 +49,7 @@ export const API = {
         GET_APPOINTMENT_STATUS: '/status/:sessionId',
         CANCEL_APPOINTMENT: '/cancel/:sessionId',
         EDIT_REPORTS: '/edit-reports',
+        CHECK_OVERLAP: '/check-overlap',
     },
     QRCODE: {
         GET: '/qrcode',
