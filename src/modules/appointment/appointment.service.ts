@@ -13,8 +13,9 @@ export const appointmentService = {
         userId: string;
         body: BookAppointmentReqBody;
         files: Express.Multer.File[];
+        uploadedReports?: { secure_url: string; public_id: string }[];
     }): Promise<{ checkoutUrl: string; warning?: string }> => {
-        const { userId, body, files } = params;
+        const { userId, body, files, uploadedReports: preUploadedReports } = params;
 
         // 1. Validate the user/patient
         const patient = await prisma.user.findUnique({
@@ -97,7 +98,7 @@ export const appointmentService = {
 
         // 8. Process AI summary + upload valid medical reports to Cloudinary
         let ai_summary: string | null = null;
-        const uploadedReports: { secure_url: string; public_id: string }[] = [];
+        const uploadedReports: { secure_url: string; public_id: string }[] = preUploadedReports || [];
 
         if (files && files.length > 0) {
             const { ai_summary: generatedSummary, validFiles } = await aiService.processDocuments(
@@ -120,8 +121,6 @@ export const appointmentService = {
         }
 
         // 9. Create appointment record with PAYMENT_PENDING status upfront
-        // This stores all patient data + AI summary + reports before Stripe session.
-        // Webhook will update status to SCHEDULED or PAYMENT_FAILED.
         const startAtUtcDate = startAtUtc;
         const endAtUtcDate = endAtUtc;
 
@@ -192,7 +191,6 @@ export const appointmentService = {
             }
         });
         // 11. NEW: Create the pending payment record in the database
-        // We use upsert so if the user clicks "book" again while it's pending, it just updates the session ID
         await prisma.appointment_payment.upsert({
             where: { appointment_id: pendingAppointment.id },
             create: {
@@ -200,11 +198,8 @@ export const appointmentService = {
                 amount: doctor.doctor_profile.consultation_fee,
                 currency: 'inr', 
                 payment_method: 'card', 
-                payment_status: 'pending', // Marks it as pending for your dashboard
+                payment_status: 'pending', 
                 stripe_session_id: session.id,
-                
-                // Note: If your Prisma schema has a column to store the checkout URL 
-                // for the dashboard, add it here (e.g., checkout_url: session.url)
             },
             update: {
                 amount: doctor.doctor_profile.consultation_fee,
@@ -215,7 +210,6 @@ export const appointmentService = {
             }
         });
 
-      
         return { checkoutUrl: session.url as string, warning };
     },
 
