@@ -7,7 +7,7 @@ import { cleanExtractedData } from "./chatbot.util";
 import { z } from "zod";
 import { appointmentService } from "../../appointment/appointment.service";
 import prisma from "../../../prisma/prisma"; 
-
+import * as fs from "fs";
 const llm = new ChatOpenAI({
     model: "openai/gpt-oss-120b", 
     temperature: 0,
@@ -150,7 +150,7 @@ const bookerNode = async (state: typeof AgentState.State) => {
 
         return { 
             checkout_url: bookingResult.checkoutUrl,
-            messages: [new AIMessage("All set! I've prepared your appointment. Please click the button below to complete your payment.")]
+            messages: [new AIMessage("Your appointment is confirmed! Click the button below to complete your payment and secure your slot.")]
         };
     } catch (error: any) {
         return { error: error.message || "Failed to generate appointment." };
@@ -178,4 +178,6 @@ const builder = new StateGraph(AgentState)
     .addEdge("responder", "__end__")
     .addEdge("booker", "__end__");
 
-export const chatBookingGraph = builder.compile({ checkpointer: new MemorySaver() });
+const graph=builder.compile({ checkpointer: new MemorySaver() });
+console.log(graph.getGraph().drawMermaid());
+export const chatBookingGraph = graph;
