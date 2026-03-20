@@ -21,7 +21,7 @@ const extractionLlmStructured = llm.withStructuredOutput(PatientDetailsSchema);
 const intentLlmStructured = llm.withStructuredOutput(z.object({ confirmed: z.boolean().nullable() }));
 const conversationalLlm = new ChatOpenAI({
     model: "openai/gpt-oss-120b",
-    temperature: 0.6,
+    temperature: 0.3,
     apiKey: process.env.OPENROUTER_API_KEY,
     configuration: {
         baseURL: "https://openrouter.ai/api/v1",
@@ -148,6 +148,8 @@ const responderNode = async (state: typeof AgentState.State) => {
 };
 
 const bookerNode = async (state: typeof AgentState.State) => {
+    console.log("[bookerNode] Starting booking. booking_context:", JSON.stringify(state.booking_context));
+    console.log("[bookerNode] collected_data:", JSON.stringify(state.collected_data));
     try {
         if (!state.booking_context.doctor_id) throw new Error("Doctor ID missing from context");
         if (!state.booking_context.patient_id) throw new Error("Patient ID missing from context");
@@ -199,9 +201,13 @@ const bookerNode = async (state: typeof AgentState.State) => {
         };
     } catch (error: any) {
         const errMsg = error.message || "Failed to generate appointment.";
-        // Return error both as state (for service layer) and as a visible chat message
+        console.error("[bookerNode] Booking failed:", errMsg);
+        // Reset is_confirmed and details_shown so the next user turn goes through
+        // the normal flow again (responder), instead of looping back to the booker.
         return { 
             error: errMsg,
+            is_confirmed: false,
+            details_shown: false,
             messages: [new AIMessage(`❌ Something went wrong: ${errMsg}\n\nPlease try again or contact support if the issue persists.`)]
         };
     }
