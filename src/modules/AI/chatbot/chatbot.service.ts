@@ -41,7 +41,9 @@ export const chatBookingService = {
             } 
             else if (chunk.booker) {
                 if (chunk.booker.error) {
-                    yield { type: "error", data: { text: chunk.booker.error } };
+                    // Show error as a visible chat message AND a toast
+                    const errText = chunk.booker.messages?.[0]?.content || chunk.booker.error;
+                    yield { type: "ai_message", data: { text: errText } };
                 } else {
                     yield { 
                         type: "checkout", 

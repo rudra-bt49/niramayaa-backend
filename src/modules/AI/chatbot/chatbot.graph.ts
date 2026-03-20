@@ -30,11 +30,17 @@ const conversationalLlm = new ChatOpenAI({
 
 const extractorNode = async (state: typeof AgentState.State) => {
     // Look at last 10 messages for context
-    const recentMessages = state.messages.slice(-10);
+    const recentMessages = state.messages.slice(-20);
     
-    // 1. Extract Details
-    const extracted = await extractionLlmStructured.invoke([getExtractionPrompt(), ...recentMessages]);
-    const cleaned = cleanExtractedData(extracted);
+    // 1. Extract Details — wrapped in try/catch because OpenRouter can return empty output
+    //    which causes OUTPUT_PARSING_FAILURE. On failure we return no new fields (safe default).
+    let cleaned: Partial<typeof state.collected_data> = {};
+    try {
+        const extracted = await extractionLlmStructured.invoke([getExtractionPrompt(), ...recentMessages]);
+        cleaned = cleanExtractedData(extracted);
+    } catch (err) {
+        console.warn("[extractorNode] Extraction LLM failed, using empty result:", (err as any)?.lc_error_code ?? err);
+    }
     
     // Identify what was newly added vs updated
     const newlyExtracted = Object.keys(cleaned).filter(key => !(state.collected_data as any)[key]);
@@ -56,11 +62,38 @@ const extractorNode = async (state: typeof AgentState.State) => {
     }
 
     if (allPresent) {
-        const intentResult = await intentLlmStructured.invoke([getIntentExtractionPrompt(), ...recentMessages]);
-        if (intentResult.confirmed === true) isConfirmed = true;
-        if (intentResult.confirmed === false) {
+        const lastHumanMessage = [...state.messages].reverse().find(m => m._getType() === "human");
+        const lastText = (lastHumanMessage?.content as string || "").trim().toLowerCase();
+
+        // --- Hardcoded affirmative check (fast path, no LLM needed) ---
+        const AFFIRMATIVES = ["yes", "y", "ok", "okay", "sure", "correct", "yep", "yeah", "yup",
+                              "proceed", "confirm", "book it", "go ahead", "looks good", "alright",
+                              "that's right", "book", "done", "sounds good", "fine", "absolutely",
+                              "definitely", "of course", "go on", "let's go", "lets go", "agreed"];
+        const NEGATIVES = ["no", "nope", "cancel", "stop", "wrong", "not correct", "change"];
+
+        const isHardAffirm = AFFIRMATIVES.some(kw => lastText === kw || lastText.startsWith(kw + " ") || lastText.endsWith(" " + kw));
+        const isHardNegate = NEGATIVES.some(kw => lastText === kw || lastText.startsWith(kw + " "));
+
+        if (isHardAffirm && !isHardNegate) {
+            isConfirmed = true;
+        } else if (isHardNegate) {
             isConfirmed = false;
-            detailsShown = false; 
+            detailsShown = false;
+        } else {
+            // Fall back to LLM only for ambiguous messages
+            try {
+                const intentMessages = lastHumanMessage ? [lastHumanMessage] : recentMessages;
+                const intentResult = await intentLlmStructured.invoke([getIntentExtractionPrompt(), ...intentMessages]);
+                if (intentResult.confirmed === true) isConfirmed = true;
+                if (intentResult.confirmed === false) {
+                    isConfirmed = false;
+                    detailsShown = false;
+                }
+            } catch (err) {
+                console.warn("[extractorNode] Intent LLM failed, leaving confirmation unchanged:", (err as any)?.lc_error_code ?? err);
+                // Leave isConfirmed as-is — responder will re-ask the user
+            }
         }
     }
 
@@ -77,12 +110,24 @@ const validatorNode = async (state: typeof AgentState.State) => {
     const required = ["description", "height", "weight", "blood_group"];
     const currentData = state.collected_data;
     const missing = required.filter(field => !(currentData as any)[field]);
-    return { missing_fields: missing };
+    // Explicitly forward is_confirmed so it is guaranteed to be in state
+    // before routeAfterValidation fires — eliminates node-ordering ambiguity.
+    return { missing_fields: missing, is_confirmed: state.is_confirmed };
 };
 
 const responderNode = async (state: typeof AgentState.State) => {
+    // Safety guard: if the user is confirmed AND all fields exist in collected_data,
+    // the booker should have run — this is a fallback for edge cases.
+    const required = ["description", "height", "weight", "blood_group"];
+    const allDataPresent = required.every(f => (state.collected_data as any)[f]);
+    if (allDataPresent && state.is_confirmed) {
+        return {
+            messages: [new AIMessage("Almost there! Generating your payment link now...")],
+            details_shown: true
+        };
+    }
     
-    const recentMessages = state.messages.slice(-10);
+    const recentMessages = state.messages.slice(-20);
     const prompt = getConversationalPrompt(
         state.missing_fields, 
         state.newly_extracted_fields,
@@ -150,16 +195,26 @@ const bookerNode = async (state: typeof AgentState.State) => {
 
         return { 
             checkout_url: bookingResult.checkoutUrl,
-            messages: [new AIMessage("Your appointment is confirmed! Click the button below to complete your payment and secure your slot.")]
+            messages: [new AIMessage("✅ All set! Click the button below to complete your payment and secure your appointment slot.")]
         };
     } catch (error: any) {
-        return { error: error.message || "Failed to generate appointment." };
+        const errMsg = error.message || "Failed to generate appointment.";
+        // Return error both as state (for service layer) and as a visible chat message
+        return { 
+            error: errMsg,
+            messages: [new AIMessage(`❌ Something went wrong: ${errMsg}\n\nPlease try again or contact support if the issue persists.`)]
+        };
     }
 };
 
 // --- ROUTING LOGIC ---
 const routeAfterValidation = (state: typeof AgentState.State) => {
-    if (state.missing_fields.length === 0 && state.is_confirmed) {
+    const required = ["description", "height", "weight", "blood_group"];
+    // Use both missing_fields list AND a direct collected_data check to avoid
+    // any state-timing edge cases where missing_fields could be stale.
+    const noMissingFields = state.missing_fields.length === 0;
+    const allDataPresent = required.every(f => (state.collected_data as any)[f]);
+    if ((noMissingFields || allDataPresent) && state.is_confirmed) {
         return "booker";
     }
     return "responder";
