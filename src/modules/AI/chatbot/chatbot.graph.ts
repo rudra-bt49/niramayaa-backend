@@ -1,5 +1,5 @@
 import { StateGraph, MemorySaver } from "@langchain/langgraph";
-import { ChatGroq } from "@langchain/groq";
+import { ChatOpenAI } from "@langchain/openai";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { AgentState, PatientDetailsSchema } from "./chatbot.types";
 import { getExtractionPrompt, getIntentExtractionPrompt, getConversationalPrompt } from "./chatbot.prompts";
@@ -8,18 +8,24 @@ import { z } from "zod";
 import { appointmentService } from "../../appointment/appointment.service";
 import prisma from "../../../prisma/prisma"; 
 
-const llm = new ChatGroq({
-    apiKey: process.env.GROQ_API_KEY,
-    model: "openai/gpt-oss-20b", 
-    temperature: 0, 
+const llm = new ChatOpenAI({
+    model: "openai/gpt-oss-120b", 
+    temperature: 0,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    configuration: {
+        baseURL: "https://openrouter.ai/api/v1",
+    },
 });
 
 const extractionLlmStructured = llm.withStructuredOutput(PatientDetailsSchema);
 const intentLlmStructured = llm.withStructuredOutput(z.object({ confirmed: z.boolean().nullable() }));
-const conversationalLlm = new ChatGroq({ 
-    apiKey: process.env.GROQ_API_KEY, 
-    model: "openai/gpt-oss-120b", 
-    temperature: 0.6 
+const conversationalLlm = new ChatOpenAI({
+    model: "openai/gpt-oss-120b",
+    temperature: 0.6,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    configuration: {
+        baseURL: "https://openrouter.ai/api/v1",
+    },
 });
 
 const extractorNode = async (state: typeof AgentState.State) => {
@@ -75,6 +81,7 @@ const validatorNode = async (state: typeof AgentState.State) => {
 };
 
 const responderNode = async (state: typeof AgentState.State) => {
+    
     const recentMessages = state.messages.slice(-10);
     const prompt = getConversationalPrompt(
         state.missing_fields, 

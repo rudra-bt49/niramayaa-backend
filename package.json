@@ -23,8 +23,8 @@
   "homepage": "https://github.com/rudra-bt49/niramayaa-backend#readme",
   "dependencies": {
     "@huggingface/inference": "^4.13.15",
-    "@langchain/groq": "^1.1.5",
     "@langchain/langgraph": "^1.2.2",
+    "@langchain/openai": "^1.3.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@types/express-rate-limit": "^5.1.3",
