@@ -39,6 +39,8 @@ export const voiceService = {
                 },
                 voice: { provider: "11labs", voiceId: "paula" },
                 endCallFunctionEnabled: true, 
+                endCallMessage: "All set! I've prepared your appointment you can do payment from appointment dashboard.",
+                endCallPhrases: ["All set! I've prepared your appointment you can do payment from appointment dashboard."],
                 maxDurationSeconds: 180, 
                 silenceTimeoutSeconds: 15, 
                 analysisPlan: {
