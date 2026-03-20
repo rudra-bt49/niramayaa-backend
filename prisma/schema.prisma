@@ -1,0 +1,609 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Specialty {
+  GENERAL_PRACTICE
+  INTERNAL_MEDICINE
+  CARDIOLOGY
+  DERMATOLOGY
+  ENDOCRINOLOGY
+  GASTROENTEROLOGY
+  NEUROLOGY
+  NEPHROLOGY
+  ONCOLOGY
+  OPHTHALMOLOGY
+  ORTHOPEDICS
+  OTOLARYNGOLOGY
+  PEDIATRICS
+  PSYCHIATRY
+  PULMONOLOGY
+  RADIOLOGY
+  RHEUMATOLOGY
+  UROLOGY
+  OBSTETRICS_AND_GYNECOLOGY
+  ANESTHESIOLOGY
+  EMERGENCY_MEDICINE
+  PATHOLOGY
+  PLASTIC_SURGERY
+  GENERAL_SURGERY
+  VASCULAR_SURGERY
+  INFECTIOUS_DISEASE
+  HEMATOLOGY
+  GERIATRICS
+  SPORTS_MEDICINE
+  PALLIATIVE_CARE
+  DENTISTRY
+  PHYSIOTHERAPY
+  NUTRITION_AND_DIETETICS
+  AUDIOLOGY
+}
+
+enum Qualification {
+  MBBS
+  MD
+  MS
+  DO
+  BDS
+  MDS
+  BAMS
+  BHMS
+  BUMS
+  BNYS
+  DM
+  MCH
+  DNB
+  FCPS
+  MRCP
+  MRCS
+  FRCS
+  FRCP
+  PHD
+  MPH
+  BSC_NURSING
+  MSC_NURSING
+  BPT
+  MPT
+  BSC_ALLIED_HEALTH
+}
+
+enum BloodType {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
+
+enum AppointmentStatus {
+
+  SCHEDULED
+  PAYMENT_PENDING
+  PAYMENT_FAILED
+  COMPLETED
+  REFUND_REQUESTED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum DosageUnit {
+  TABLET
+  CAPSULE
+  ML
+  MG
+  DROPS
+  TEASPOON
+  TABLESPOON
+  PUFF
+  PATCH
+  SACHET
+  BOTTLE
+  TUBE
+  INJECTION
+}
+
+enum MealTiming {
+  BEFORE_MEAL
+  AFTER_MEAL
+  WITH_MEAL
+}
+
+enum IndianCity {
+  // Maharashtra
+  MUMBAI
+  PUNE
+  NAGPUR
+  NASHIK
+  AURANGABAD
+  SOLAPUR
+  KOLHAPUR
+  THANE
+  NAVI_MUMBAI
+  AMRAVATI
+  // Delhi & NCR
+  NEW_DELHI
+  GURGAON
+  NOIDA
+  FARIDABAD
+  GHAZIABAD
+  // Karnataka
+  BENGALURU
+  MYSURU
+  HUBLI
+  MANGALURU
+  BELGAUM
+  // Tamil Nadu
+  CHENNAI
+  COIMBATORE
+  MADURAI
+  TIRUCHIRAPPALLI
+  SALEM
+  // Telangana
+  HYDERABAD
+  WARANGAL
+  NIZAMABAD
+  // Andhra Pradesh
+  VISAKHAPATNAM
+  VIJAYAWADA
+  GUNTUR
+  // Gujarat
+  AHMEDABAD
+  SURAT
+  VADODARA
+  RAJKOT
+  BHAVNAGAR
+  NADIAD  
+  // Rajasthan
+  JAIPUR
+  JODHPUR
+  UDAIPUR
+  KOTA
+  AJMER
+  // Uttar Pradesh
+  LUCKNOW
+  KANPUR
+  AGRA
+  VARANASI
+  ALLAHABAD
+  MEERUT
+  // West Bengal
+  KOLKATA
+  HOWRAH
+  DURGAPUR
+  ASANSOL
+  // Punjab
+  LUDHIANA
+  AMRITSAR
+  JALANDHAR
+  // Madhya Pradesh
+  BHOPAL
+  INDORE
+  GWALIOR
+  JABALPUR
+  // Bihar
+  PATNA
+  GAYA
+  BHAGALPUR
+  // Odisha
+  BHUBANESWAR
+  CUTTACK
+  ROURKELA
+  // Assam
+  GUWAHATI
+  DIBRUGARH
+  // Jharkhand
+  RANCHI
+  JAMSHEDPUR
+  DHANBAD
+  // Chhattisgarh
+  RAIPUR
+  BHILAI
+  // Haryana
+  CHANDIGARH
+  AMBALA
+  ROHTAK
+  // Himachal Pradesh
+  SHIMLA
+  DHARAMSHALA
+  // Uttarakhand
+  DEHRADUN
+  HARIDWAR
+  ROORKEE
+  // Goa
+  PANAJI
+  MARGAO
+  // Kerala
+  THIRUVANANTHAPURAM
+  KOCHI
+  KOZHIKODE
+  THRISSUR
+  // Jammu & Kashmir
+  SRINAGAR
+  JAMMU
+  // Northeastern States
+  IMPHAL
+  SHILLONG
+  AIZAWL
+  KOHIMA
+  AGARTALA
+  ITANAGAR
+  GANGTOK
+}
+
+// ─────────────────────────────────────────────
+// ROLE
+// ─────────────────────────────────────────────
+
+model role {
+  id         String   @id @default(uuid())
+  name       String   @unique // PATIENT | DOCTOR | ADMIN
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  users user[]
+}
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
+model user {
+  id                      String     @id @default(uuid())
+  email                   String     @unique
+  password_hash           String
+  first_name              String
+  last_name               String
+  dob                     DateTime
+  gender                  Gender
+  city                    IndianCity
+  phone_number            String?
+  profile_image           String?    // Cloudinary URL
+  profile_image_public_id String?    // Cloudinary public_id — used to delete old image on update
+
+  role_id String
+  role    role   @relation(fields: [role_id], references: [id])
+
+  patient_profile patient_profile?
+  doctor_profile  doctor_profile?
+
+  user_sessions         user_session[]
+  password_reset_tokens password_reset_token[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([email])
+}
+
+// ─────────────────────────────────────────────
+// USER SESSION
+// ─────────────────────────────────────────────
+
+model user_session {
+  id                 String   @id @default(uuid())
+  user_id            String
+  user               user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  refresh_token_hash String   @unique
+  device_id          String?
+  device_name        String?
+  is_active          Boolean  @default(true)
+  last_used_at       DateTime @default(now())
+  created_at         DateTime @default(now())
+
+  @@index([user_id])
+}
+
+// ─────────────────────────────────────────────
+// PASSWORD RESET TOKEN
+// ─────────────────────────────────────────────
+
+model password_reset_token {
+  id         String   @id @default(uuid())
+  user_id    String
+  user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token_hash String   @unique
+  expires_at DateTime
+  is_used    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+}
+
+// ─────────────────────────────────────────────
+// DOCTOR PLAN
+// ─────────────────────────────────────────────
+
+/// elite_plan = queue-based walk-in (QR code). pro_plan = slot booking ahead of time.
+model doctor_plan {
+  id         String   @id @default(uuid())
+  plan_name  String   @unique // "ELITE" | "PRO"
+  amount     Float
+  duration   Int      // validity in days
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  doctor_profiles       doctor_profile[]
+  subscription_payments subscription_payment[]
+}
+
+// ─────────────────────────────────────────────
+// PATIENT PROFILE
+// ─────────────────────────────────────────────
+
+model patient_profile {
+  user_id String @id
+  user    user   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  height      Float?
+  weight      Float?
+  blood_group BloodType?
+  allergies   String?
+
+  emergency_contact_name  String?
+  emergency_contact_phone String?
+
+  appointments_as_patient appointment[] @relation("PatientAppointments")
+  ratings_given           rating[]      @relation("PatientRatings")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// DOCTOR PROFILE
+// ─────────────────────────────────────────────
+
+model doctor_profile {
+  user_id String @id
+  user    user   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  bio              String?
+  specialties      Specialty[]
+  experience       Int?
+  qualifications   Qualification[]
+  consultation_fee Float @default(500)
+
+  plan_id         String?
+  plan            doctor_plan? @relation(fields: [plan_id], references: [id])
+  plan_expires_at DateTime?
+
+  // Queue (Elite plan)
+  qrcode_token     String? // unique token encoded in QR
+  qrcode_image_url String? // Cloudinary URL
+  qrcode_public_id String? // Cloudinary public_id — used to delete old QR on regenerate
+
+  availability           availability[]
+  appointments_as_doctor appointment[]          @relation("DoctorAppointments")
+  ratings_received       rating[]               @relation("DoctorRatings")
+  subscription_payments  subscription_payment[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// AVAILABILITY
+// ─────────────────────────────────────────────
+
+model availability {
+  id        String         @id @default(uuid())
+  doctor_id String
+  doctor    doctor_profile @relation(fields: [doctor_id], references: [user_id], onDelete: Cascade)
+
+  // Stored as UTC. IST = UTC+5:30 — convert on read/write in application layer.
+  start_at      DateTime  // e.g. 09:00 IST → stored as 03:30 UTC
+  end_at        DateTime
+  break_start   DateTime?
+  break_end     DateTime?
+  slot_duration Int       // minutes
+  is_active     Boolean   @default(true)
+
+  queue_capacity      Int @default(0)
+  current_queue_token Int @default(0)
+
+  appointments appointment[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([doctor_id, start_at])
+  @@index([doctor_id])
+  @@index([start_at])
+}
+
+// ─────────────────────────────────────────────
+// APPOINTMENT
+// ─────────────────────────────────────────────
+
+model appointment {
+  id String @id @default(uuid())
+
+  patient_id String?
+  patient    patient_profile? @relation("PatientAppointments", fields: [patient_id], references: [user_id], onDelete: Cascade)
+
+  doctor_id String
+  doctor    doctor_profile @relation("DoctorAppointments", fields: [doctor_id], references: [user_id], onDelete: Cascade)
+
+  availability_id String?
+  availability    availability? @relation(fields: [availability_id], references: [id])
+
+  // Stored as UTC. Convert to IST (+5:30) in application layer.
+  start_at DateTime
+  end_at   DateTime
+
+  queue_token Int?
+
+  status AppointmentStatus
+
+  name        String
+  email       String
+  phone       String
+  gender      Gender
+  height      Float
+  weight      Float
+  blood_group BloodType
+  description String
+  ai_generated_summary String?
+  medical_reports     medical_report[]
+  appointment_payment appointment_payment?
+  rating              rating?
+  prescription        prescription?
+  call_id       String?
+  call_status   String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([doctor_id, start_at])
+  @@index([patient_id])
+  @@index([doctor_id])
+  @@index([status])
+  @@index([start_at])
+}
+
+// ─────────────────────────────────────────────
+// MEDICAL REPORT
+// ─────────────────────────────────────────────
+
+model medical_report {
+  id             String      @id @default(uuid())
+  appointment_id String
+  appointment    appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  report_url       String? // Cloudinary URL
+  report_public_id String? // Cloudinary public_id — used to delete old report on update
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([appointment_id])
+}
+
+// ─────────────────────────────────────────────
+// PRESCRIPTION
+// ─────────────────────────────────────────────
+
+model prescription {
+  id             String      @id @default(uuid())
+  appointment_id String      @unique
+  appointment    appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  items prescription_item[]
+
+  created_at DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// PRESCRIPTION ITEM
+// ─────────────────────────────────────────────
+
+model prescription_item {
+  id              String       @id @default(uuid())
+  prescription_id String
+  prescription    prescription @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
+
+  medicine_name  String
+  dosage_value   Float      // e.g. 1, 0.5, 5
+  dosage_unit    DosageUnit // TABLET, ML, MG, etc.
+
+  // Schedule: which times of day (at least one must be true)
+  morning   Boolean @default(false)
+  afternoon Boolean @default(false)
+  night     Boolean @default(false)
+
+  timing         MealTiming // BEFORE_MEAL, AFTER_MEAL, etc.
+  total_quantity Int        // e.g. 10 (tablets), 1 (bottle)
+  note           String?    // e.g. "take with warm water"
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([prescription_id])
+}
+
+// ─────────────────────────────────────────────
+// APPOINTMENT PAYMENT
+// ─────────────────────────────────────────────
+
+model appointment_payment {
+  id             String      @id @default(uuid())
+  appointment_id String      @unique
+  appointment    appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  amount            Float
+  currency          String
+  payment_method    String
+  payment_status    String
+  receipt_url       String?
+  stripe_session_id String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// SUBSCRIPTION PAYMENT
+// ─────────────────────────────────────────────
+
+model subscription_payment {
+  id        String         @id @default(uuid())
+  doctor_id String
+  doctor    doctor_profile @relation(fields: [doctor_id], references: [user_id], onDelete: Cascade)
+
+  plan_id String
+  plan    doctor_plan @relation(fields: [plan_id], references: [id])
+
+  amount            Float
+  currency          String
+  payment_method    String // raw value from Stripe
+  payment_status    String // raw value from Stripe
+  receipt_url       String?
+  stripe_session_id String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([doctor_id])
+  @@index([plan_id])
+}
+
+// ─────────────────────────────────────────────
+// RATING
+// ─────────────────────────────────────────────
+
+model rating {
+  id String @id @default(uuid())
+
+  appointment_id String      @unique
+  appointment    appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  patient_id String
+  patient    patient_profile @relation("PatientRatings", fields: [patient_id], references: [user_id], onDelete: Cascade)
+
+  doctor_id String
+  doctor    doctor_profile @relation("DoctorRatings", fields: [doctor_id], references: [user_id], onDelete: Cascade)
+
+  rating Int
+  review String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([doctor_id])
+  @@index([patient_id])
+  @@index([appointment_id])
+}
