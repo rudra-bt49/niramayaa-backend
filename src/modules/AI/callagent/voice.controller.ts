@@ -66,9 +66,10 @@ export const voiceController = {
                 const callId = message.call.id;
                 const structuredData = message.analysis?.structuredData || {};
                 const callStatus = message.endedReason; 
+                const metadata = message.call.metadata; // Extract the stateless metadata
 
                 // Process booking in the background
-                voiceService.handleEndOfCallReport(callId, structuredData, callStatus);
+                voiceService.handleEndOfCallReport(callId, metadata, structuredData, callStatus);
             }
 
             res.status(200).json({ received: true });
