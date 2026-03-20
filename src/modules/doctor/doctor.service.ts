@@ -309,7 +309,7 @@ export const doctorService = {
                 where: {
                     doctor_id: doctorId,
                     status: appointment_status.PAYMENT_PENDING,
-                    end_at: { lt: now }
+                    start_at: { lt: now }
                 },
                 data: {
                     status: appointment_status.PAYMENT_FAILED
